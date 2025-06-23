@@ -1,5 +1,5 @@
 [package]
-name = "DroidView"
+name = "droid_view"
 version = "0.1.0"
 edition = "2021"
 authors = ["Genxster1998 <ck.2229.ck@gmail.com>"]

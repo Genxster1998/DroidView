@@ -1,8 +1,8 @@
 use clap::Parser;
 use eframe::{egui, NativeOptions};
-use guiscrcpy_rs::app::DroidViewApp;
-use guiscrcpy_rs::config::AppConfig;
-use guiscrcpy_rs::logging::init_logging;
+use droid_view::app::DroidViewApp;
+use droid_view::config::AppConfig;
+use droid_view::logging::init_logging;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use std::path::Path;

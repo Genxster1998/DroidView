@@ -1250,6 +1250,36 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
+name = "droid_view"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "dirs",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "image",
+ "libc",
+ "notify-rust",
+ "os_info",
+ "path-slash",
+ "reqwest",
+ "rfd",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "winapi",
+]
+
+[[package]]
 name = "ecolor"
 version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1924,36 +1954,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bf0b36e6f090b7e1d8a4b49c0cb81c1f8376f72198c65dd3ad9ff3556b8b78c"
 dependencies = [
  "bitflags 2.9.1",
-]
-
-[[package]]
-name = "guiscrcpy-rs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "dirs",
- "eframe",
- "egui",
- "egui_extras",
- "image",
- "libc",
- "notify-rust",
- "os_info",
- "path-slash",
- "reqwest",
- "rfd",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "toml",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "winapi",
 ]
 
 [[package]]
