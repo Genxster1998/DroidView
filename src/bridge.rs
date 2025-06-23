@@ -1,7 +1,7 @@
 use anyhow::Result;
+use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
 use tokio::process::Command as TokioCommand;
-use std::io::{BufRead, BufReader};
 
 pub struct AdbBridge {
     path: String,
@@ -21,9 +21,7 @@ impl AdbBridge {
     }
 
     pub fn get_devices(&self) -> Result<Vec<String>> {
-        let output = Command::new(&self.path)
-            .args(["devices"])
-            .output()?;
+        let output = Command::new(&self.path).args(["devices"]).output()?;
 
         if !output.status.success() {
             return Err(anyhow::anyhow!("Failed to execute adb devices"));
@@ -48,15 +46,15 @@ impl AdbBridge {
 
     pub fn shell(&self, command: &str, device_id: Option<&str>) -> Result<String> {
         let mut cmd = Command::new(&self.path);
-        
+
         if let Some(device) = device_id {
             cmd.args(["-s", device]);
         }
-        
+
         cmd.args(["shell", command]);
-        
+
         let output = cmd.output()?;
-        
+
         if !output.status.success() {
             return Err(anyhow::anyhow!("Shell command failed"));
         }
@@ -66,15 +64,15 @@ impl AdbBridge {
 
     pub fn tcpip(&self, port: u16, device_id: Option<&str>) -> Result<()> {
         let mut cmd = Command::new(&self.path);
-        
+
         if let Some(device) = device_id {
             cmd.args(["-s", device]);
         }
-        
+
         cmd.args(["-d", "tcpip", &port.to_string()]);
-        
+
         let status = cmd.status()?;
-        
+
         if !status.success() {
             return Err(anyhow::anyhow!("TCP/IP command failed"));
         }
@@ -121,11 +119,11 @@ impl ScrcpyBridge {
         cmd.args(args);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
-        
+
         // Log the full command being executed for debugging
         tracing::info!("Starting scrcpy with path: {}", self.path);
         tracing::info!("Full command: {} {}", self.path, args.join(" "));
-        
+
         // Log environment variables that might affect scrcpy
         if let Ok(path) = std::env::var("PATH") {
             tracing::info!("PATH environment: {}", path);
@@ -136,17 +134,20 @@ impl ScrcpyBridge {
         if let Ok(wayland_display) = std::env::var("WAYLAND_DISPLAY") {
             tracing::info!("WAYLAND_DISPLAY environment: {}", wayland_display);
         }
-        
+
         let mut child = cmd.spawn()?;
-        
+
         // Wait a moment to see if the process exits immediately
         std::thread::sleep(std::time::Duration::from_millis(500));
-        
+
         // Check if the process is still running
         match child.try_wait() {
             Ok(Some(status)) => {
-                tracing::error!("Scrcpy process exited immediately with status: {:?}", status);
-                
+                tracing::error!(
+                    "Scrcpy process exited immediately with status: {:?}",
+                    status
+                );
+
                 // Try to capture any stderr output that might explain the exit
                 if let Some(stderr) = child.stderr.take() {
                     let reader = BufReader::new(stderr);
@@ -163,12 +164,15 @@ impl ScrcpyBridge {
                         }
                     }
                 }
-                
-                return Err(anyhow::anyhow!("Scrcpy process exited immediately with status: {:?}", status));
+
+                return Err(anyhow::anyhow!(
+                    "Scrcpy process exited immediately with status: {:?}",
+                    status
+                ));
             }
             Ok(None) => {
                 tracing::info!("Scrcpy process started successfully and is still running");
-                
+
                 // Spawn a background thread to monitor stderr output
                 if let Some(stderr) = child.stderr.take() {
                     let reader = BufReader::new(stderr);
@@ -185,7 +189,7 @@ impl ScrcpyBridge {
                 tracing::error!("Error checking scrcpy process status: {}", e);
             }
         }
-        
+
         Ok(child)
     }
 
@@ -194,10 +198,10 @@ impl ScrcpyBridge {
         cmd.args(args);
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
-        
+
         // Log the command for async version too
         tracing::info!("Starting scrcpy async with args: {:?}", args);
-        
+
         let child = cmd.spawn()?;
         Ok(child)
     }
@@ -208,10 +212,10 @@ impl ScrcpyBridge {
         bitrate: u32,
         orientation: Option<String>,
         show_touches: bool,
-        display_force_on: bool,
         fullscreen: bool,
         dimension: Option<u32>,
         extra_args: &str,
+        turn_screen_off: bool,
     ) -> Vec<String> {
         let mut args = Vec::new();
 
@@ -231,16 +235,16 @@ impl ScrcpyBridge {
             args.push("--show-touches".to_string());
         }
 
-        if display_force_on {
-            args.push("--display-force-on".to_string());
-        }
-
         if fullscreen {
             args.push("--fullscreen".to_string());
         }
 
         if let Some(dim) = dimension {
             args.extend_from_slice(&["--max-size".to_string(), dim.to_string()]);
+        }
+
+        if turn_screen_off {
+            args.push("-S".to_string());
         }
 
         // Parse extra arguments
@@ -254,4 +258,4 @@ impl ScrcpyBridge {
 
         args
     }
-} 
+}

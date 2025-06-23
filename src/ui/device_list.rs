@@ -6,6 +6,12 @@ pub struct DeviceList {
     selected_device: Option<usize>,
 }
 
+impl Default for DeviceList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeviceList {
     pub fn new() -> Self {
         Self {
@@ -16,7 +22,7 @@ impl DeviceList {
 
     pub fn update_devices(&mut self, devices: Vec<Device>) {
         self.devices = devices;
-        
+
         // Reset selection if device list is empty
         if self.devices.is_empty() {
             self.selected_device = None;
@@ -44,7 +50,7 @@ impl DeviceList {
 
     pub fn show(&mut self, ui: &mut Ui) {
         ui.heading("Connected Devices");
-        
+
         if self.devices.is_empty() {
             ui.label(RichText::new("No devices found").color(Color32::GRAY));
             return;
@@ -54,7 +60,7 @@ impl DeviceList {
             for (index, device) in self.devices.iter().enumerate() {
                 let is_selected = self.selected_device == Some(index);
                 let is_usable = device.is_usable();
-                
+
                 let text = if is_usable {
                     RichText::new(&device.model)
                 } else {
@@ -64,16 +70,22 @@ impl DeviceList {
                 let status_text = match &device.status {
                     DeviceStatus::Device => RichText::new("✅ Connected").color(Color32::GREEN),
                     DeviceStatus::Offline => RichText::new("❌ Offline").color(Color32::RED),
-                    DeviceStatus::Unauthorized => RichText::new("⚠️ Unauthorized").color(Color32::YELLOW),
-                    DeviceStatus::NoPermission => RichText::new("🚫 No Permission").color(Color32::RED),
-                    DeviceStatus::Unknown(s) => RichText::new(format!("❓ {}", s)).color(Color32::GRAY),
+                    DeviceStatus::Unauthorized => {
+                        RichText::new("⚠️ Unauthorized").color(Color32::YELLOW)
+                    }
+                    DeviceStatus::NoPermission => {
+                        RichText::new("🚫 No Permission").color(Color32::RED)
+                    }
+                    DeviceStatus::Unknown(s) => {
+                        RichText::new(format!("❓ {}", s)).color(Color32::GRAY)
+                    }
                 };
 
                 ui.horizontal(|ui| {
                     if ui.selectable_label(is_selected, text).clicked() && is_usable {
                         self.selected_device = Some(index);
                     }
-                    
+
                     ui.label(status_text);
                 });
 
@@ -88,4 +100,4 @@ impl DeviceList {
             }
         });
     }
-} 
+}

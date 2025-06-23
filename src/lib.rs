@@ -7,4 +7,4 @@ pub mod ui;
 pub mod utils;
 
 pub use app::DroidViewApp;
-pub use config::AppConfig; 
+pub use config::AppConfig;

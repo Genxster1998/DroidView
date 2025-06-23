@@ -43,11 +43,15 @@ pub fn is_process_running(process_name: &str) -> bool {
         let output = Command::new("tasklist")
             .args(["/FI", &format!("IMAGENAME eq {}", process_name)])
             .output();
-        
+
         if let Ok(output) = output {
             let output_str = String::from_utf8_lossy(&output.stdout);
             let is_running = output_str.contains(process_name);
-            tracing::debug!("Windows process check for '{}': {}", process_name, is_running);
+            tracing::debug!(
+                "Windows process check for '{}': {}",
+                process_name,
+                is_running
+            );
             is_running
         } else {
             tracing::debug!("Windows process check for '{}' failed", process_name);
@@ -57,10 +61,8 @@ pub fn is_process_running(process_name: &str) -> bool {
 
     #[cfg(not(target_os = "windows"))]
     {
-        let output = Command::new("pgrep")
-            .arg(process_name)
-            .output();
-        
+        let output = Command::new("pgrep").arg(process_name).output();
+
         if let Ok(output) = output {
             let is_running = output.status.success();
             tracing::debug!("Unix process check for '{}': {}", process_name, is_running);
@@ -79,9 +81,7 @@ pub fn is_process_running(process_name: &str) -> bool {
 pub fn open_url(url: &str) -> Result<()> {
     #[cfg(target_os = "windows")]
     {
-        Command::new("cmd")
-            .args(["/C", "start", url])
-            .spawn()?;
+        Command::new("cmd").args(["/C", "start", url]).spawn()?;
     }
 
     #[cfg(target_os = "macos")]
@@ -124,4 +124,4 @@ pub fn sanitize_filename(filename: &str) -> String {
             }
         })
         .collect()
-} 
+}

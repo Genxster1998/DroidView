@@ -11,7 +11,7 @@ pub struct AppConfig {
     pub bitrate: u32,
     pub orientation: Option<String>,
     pub show_touches: bool,
-    pub display_force_on: bool,
+    pub turn_screen_off: bool,
     pub fullscreen: bool,
     pub dimension: Option<u32>,
     pub extra_args: String,
@@ -34,7 +34,7 @@ impl Default for AppConfig {
             bitrate: 8000,
             orientation: None,
             show_touches: false,
-            display_force_on: false,
+            turn_screen_off: false,
             fullscreen: false,
             dimension: None,
             extra_args: String::new(),
@@ -51,7 +51,7 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn load() -> Result<Self> {
         let config_path = Self::config_path()?;
-        
+
         if config_path.exists() {
             let content = fs::read_to_string(config_path)?;
             let config: AppConfig = toml::from_str(&content)?;
@@ -63,23 +63,22 @@ impl AppConfig {
 
     pub fn save(&self) -> Result<()> {
         let config_path = Self::config_path()?;
-        
+
         // Ensure config directory exists
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)?;
         }
-        
+
         let content = toml::to_string_pretty(self)?;
         fs::write(config_path, content)?;
         Ok(())
     }
 
     fn config_path() -> Result<PathBuf> {
-        let mut path = config_dir().ok_or_else(|| {
-            anyhow::anyhow!("Could not determine config directory")
-        })?;
+        let mut path =
+            config_dir().ok_or_else(|| anyhow::anyhow!("Could not determine config directory"))?;
         path.push("DroidView");
         path.push("config.toml");
         Ok(path)
     }
-} 
+}

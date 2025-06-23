@@ -37,6 +37,12 @@ pub struct WirelessAdbPanel {
     selected_device: Option<String>,
 }
 
+impl Default for SwipePanel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SwipePanel {
     pub fn new() -> Self {
         Self { visible: true }
@@ -49,7 +55,7 @@ impl SwipePanel {
 
         ui.group(|ui| {
             ui.heading("Swipe Controls");
-            
+
             ui.horizontal(|ui| {
                 if ui.button("▲ Swipe Up").clicked() {
                     // TODO: Implement swipe up
@@ -58,7 +64,7 @@ impl SwipePanel {
                     // TODO: Implement swipe down
                 }
             });
-            
+
             ui.horizontal(|ui| {
                 if ui.button("◀ Swipe Left").clicked() {
                     // TODO: Implement swipe left
@@ -68,6 +74,12 @@ impl SwipePanel {
                 }
             });
         });
+    }
+}
+
+impl Default for ToolkitPanel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -85,26 +97,32 @@ impl ToolkitPanel {
 
         ui.group(|ui| {
             ui.heading("Toolkit");
-            
+
             ui.vertical(|ui| {
                 if ui.button("📸 Screenshot").clicked() {
                     action = ToolkitAction::Screenshot;
                 }
-                
+
                 if ui.button("🎥 Record Screen").clicked() {
                     action = ToolkitAction::RecordScreen;
                 }
-                
+
                 if ui.button("📱 Install APK").clicked() {
                     action = ToolkitAction::InstallApk;
                 }
-                
+
                 if ui.button("📁 File Manager").clicked() {
                     action = ToolkitAction::FileManager;
                 }
             });
         });
         action
+    }
+}
+
+impl Default for BottomPanel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -122,16 +140,16 @@ impl BottomPanel {
 
         ui.group(|ui| {
             ui.heading("Quick Actions");
-            
+
             ui.horizontal(|ui| {
                 if ui.button("🔄 Refresh Devices").clicked() {
                     action = BottomPanelAction::RefreshDevices;
                 }
-                
+
                 if ui.button("🔄 Restart ADB").clicked() {
                     action = BottomPanelAction::RestartAdb;
                 }
-                
+
                 if ui.button("🔧 Settings").clicked() {
                     action = BottomPanelAction::OpenSettings;
                 }
@@ -139,6 +157,12 @@ impl BottomPanel {
         });
 
         action
+    }
+}
+
+impl Default for WirelessAdbPanel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -155,7 +179,12 @@ impl WirelessAdbPanel {
         }
     }
 
-    pub fn show(&mut self, ui: &mut Ui, _adb_bridge: Option<&crate::bridge::AdbBridge>, devices: &[crate::device::Device]) -> Option<WirelessAdbAction> {
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        _adb_bridge: Option<&crate::bridge::AdbBridge>,
+        devices: &[crate::device::Device],
+    ) -> Option<WirelessAdbAction> {
         if !self.visible {
             return None;
         }
@@ -164,21 +193,21 @@ impl WirelessAdbPanel {
 
         ui.group(|ui| {
             ui.heading("Wireless ADB");
-            
+
             // TCP/IP Connection Section
             ui.group(|ui| {
                 ui.heading("Direct TCP/IP Connection");
-                
+
                 ui.horizontal(|ui| {
                     ui.label("IP Address:");
                     ui.text_edit_singleline(&mut self.tcpip_ip);
                 });
-                
+
                 ui.horizontal(|ui| {
                     ui.label("Port:");
                     ui.text_edit_singleline(&mut self.tcpip_port);
                 });
-                
+
                 if ui.button("🔗 Connect").clicked() {
                     if let Ok(port) = self.tcpip_port.parse::<u16>() {
                         action = Some(WirelessAdbAction::Connect {
@@ -194,7 +223,7 @@ impl WirelessAdbPanel {
             // TCP/IP Setup Section (for connected devices)
             ui.group(|ui| {
                 ui.heading("Enable TCP/IP on Device");
-                
+
                 if devices.is_empty() {
                     ui.label("No devices connected");
                 } else {
@@ -203,7 +232,7 @@ impl WirelessAdbPanel {
                         .selected_text(
                             self.selected_device
                                 .as_ref()
-                                .unwrap_or(&"Select a device".to_string())
+                                .unwrap_or(&"Select a device".to_string()),
                         )
                         .show_ui(ui, |ui| {
                             for device in devices {
@@ -217,7 +246,7 @@ impl WirelessAdbPanel {
                             }
                         });
 
-                    if let Some(port) = self.tcpip_port.parse::<u16>().ok() {
+                    if let Ok(port) = self.tcpip_port.parse::<u16>() {
                         if ui.button("🌐 Enable TCP/IP").clicked() {
                             if let Some(device_id) = &self.selected_device {
                                 action = Some(WirelessAdbAction::EnableTcpip {
@@ -235,22 +264,22 @@ impl WirelessAdbPanel {
             // Pairing Section
             ui.group(|ui| {
                 ui.heading("Pair via Code");
-                
+
                 ui.horizontal(|ui| {
                     ui.label("IP Address:");
                     ui.text_edit_singleline(&mut self.pairing_ip);
                 });
-                
+
                 ui.horizontal(|ui| {
                     ui.label("Port:");
                     ui.text_edit_singleline(&mut self.pairing_port);
                 });
-                
+
                 ui.horizontal(|ui| {
                     ui.label("Pairing Code:");
                     ui.text_edit_singleline(&mut self.pairing_code);
                 });
-                
+
                 if ui.button("🔐 Pair").clicked() {
                     if let Ok(port) = self.pairing_port.parse::<u16>() {
                         action = Some(WirelessAdbAction::Pair {
@@ -271,4 +300,4 @@ pub enum WirelessAdbAction {
     Connect { ip: String, port: u16 },
     EnableTcpip { device_id: String, port: u16 },
     Pair { ip: String, port: u16, code: String },
-} 
+}

@@ -1,13 +1,12 @@
 use clap::Parser;
-use eframe::{egui, NativeOptions};
 use droid_view::app::DroidViewApp;
 use droid_view::config::AppConfig;
 use droid_view::logging::init_logging;
+use eframe::{egui, NativeOptions};
+use egui::IconData;
+use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::path::Path;
-use image::GenericImageView;
-use egui::IconData;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -66,9 +65,16 @@ async fn main() -> Result<(), eframe::Error> {
         let img = img.to_rgba8();
         let (width, height) = img.dimensions();
         let rgba = img.into_raw();
-        Some(Arc::new(IconData { rgba, width, height }))
+        Some(Arc::new(IconData {
+            rgba,
+            width,
+            height,
+        }))
     } else {
-        eprintln!("Warning: Could not load app icon at {}", icon_path.display());
+        eprintln!(
+            "Warning: Could not load app icon at {}",
+            icon_path.display()
+        );
         None
     };
     if let Some(icon) = icon {
@@ -87,8 +93,6 @@ async fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "DroidView",
         native_options,
-        Box::new(move |cc| {
-            Box::new(DroidViewApp::new(cc, config, debug_disable_scrcpy))
-        }),
+        Box::new(move |cc| Box::new(DroidViewApp::new(cc, config, debug_disable_scrcpy))),
     )
-} 
+}

@@ -37,9 +37,7 @@ impl SettingsWindow {
                 .open(&mut open)
                 .resizable(true)
                 .default_size([400.0, 500.0])
-                .show(ctx, |ui| {
-                    show_settings_content(ui, &mut *config)
-                });
+                .show(ctx, |ui| show_settings_content(ui, &mut config));
 
             if let Some(inner) = response.and_then(|r| r.inner) {
                 match inner {
@@ -84,7 +82,7 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
         // Paths section
         ui.group(|ui| {
             ui.heading("Paths");
-            
+
             ui.label("ADB Path:");
             ui.horizontal(|ui| {
                 ui.text_edit_singleline(config.adb_path.get_or_insert_with(String::new));
@@ -92,7 +90,7 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
                     // TODO: Implement file picker
                 }
             });
-            
+
             ui.label("Scrcpy Path:");
             ui.horizontal(|ui| {
                 ui.text_edit_singleline(config.scrcpy_path.get_or_insert_with(String::new));
@@ -105,10 +103,10 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
         // Video settings
         ui.group(|ui| {
             ui.heading("Video Settings");
-            
+
             ui.label(format!("Bitrate: {} KB/s", config.bitrate));
             ui.add(egui::Slider::new(&mut config.bitrate, 1000..=20000).text("Bitrate"));
-            
+
             ui.label("Orientation:");
             let orientations = [
                 (None, "Default"),
@@ -125,23 +123,27 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
                 .selected_text(
                     orientations
                         .iter()
-                        .find(|(val,_)| val.as_ref().map(|v| v.to_string()) == config.orientation)
-                        .map(|(_,label)| *label)
-                        .unwrap_or("Default")
+                        .find(|(val, _)| val.as_ref().map(|v| v.to_string()) == config.orientation)
+                        .map(|(_, label)| *label)
+                        .unwrap_or("Default"),
                 )
                 .show_ui(ui, |ui| {
                     for (val, label) in orientations.iter() {
-                        let selected = config.orientation.as_ref().map(|v| v == &val.unwrap_or("").to_string()).unwrap_or(val.is_none());
+                        let selected = config
+                            .orientation
+                            .as_ref()
+                            .map(|v| v == &val.unwrap_or("").to_string())
+                            .unwrap_or(val.is_none());
                         if ui.selectable_label(selected, *label).clicked() {
                             config.orientation = val.map(|v| v.to_string());
                         }
                     }
                 });
-            
+
             ui.checkbox(&mut config.show_touches, "Show touches");
-            ui.checkbox(&mut config.display_force_on, "Force display on");
+            ui.checkbox(&mut config.turn_screen_off, "Turn screen off");
             ui.checkbox(&mut config.fullscreen, "Fullscreen");
-            
+
             ui.label("Max dimension:");
             ui.horizontal(|ui| {
                 let mut custom_dim = config.dimension.is_some();
@@ -153,7 +155,11 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
                     }
                 }
                 if let Some(ref mut dim) = config.dimension {
-                    ui.add(egui::DragValue::new(dim).suffix("px").clamp_range(100..=10000));
+                    ui.add(
+                        egui::DragValue::new(dim)
+                            .suffix("px")
+                            .clamp_range(100..=10000),
+                    );
                 }
             });
         });
@@ -189,11 +195,11 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
         if ui.button("💾 Save").clicked() {
             result = SettingsResult::Save;
         }
-        
+
         if ui.button("❌ Cancel").clicked() {
             result = SettingsResult::Close;
         }
-        
+
         if ui.button("🔄 Reset to Defaults").clicked() {
             *config = AppConfig::default();
             result = SettingsResult::Reset;
@@ -201,4 +207,4 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
     });
 
     result
-} 
+}

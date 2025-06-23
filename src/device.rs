@@ -48,7 +48,7 @@ impl Device {
         }
 
         let output_str = String::from_utf8_lossy(&output.stdout);
-        
+
         // Parse output like "Physical size: 1080x2400" or "Override size: 1080x2400"
         for line in output_str.lines() {
             if line.contains("Physical size:") || line.contains("Override size:") {
@@ -57,10 +57,9 @@ impl Device {
                     let size_str = parts[1].trim();
                     let dimensions: Vec<&str> = size_str.split('x').collect();
                     if dimensions.len() == 2 {
-                        if let (Ok(width), Ok(height)) = (
-                            dimensions[0].parse::<u32>(),
-                            dimensions[1].parse::<u32>(),
-                        ) {
+                        if let (Ok(width), Ok(height)) =
+                            (dimensions[0].parse::<u32>(), dimensions[1].parse::<u32>())
+                        {
                             return Ok(Some((width, height)));
                         }
                     }
@@ -73,9 +72,7 @@ impl Device {
 }
 
 pub fn get_devices(adb_path: &str) -> Result<Vec<Device>> {
-    let output = Command::new(adb_path)
-        .args(["devices", "-l"])
-        .output()?;
+    let output = Command::new(adb_path).args(["devices", "-l"]).output()?;
 
     if !output.status.success() {
         return Err(anyhow::anyhow!("Failed to execute adb devices"));
@@ -150,4 +147,4 @@ pub fn restart_adb_server(adb_path: &str) -> Result<()> {
     }
 
     Ok(())
-} 
+}
