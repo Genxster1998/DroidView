@@ -448,12 +448,15 @@ impl DroidViewApp {
                     let adb_path = adb_bridge.path();
                     let device_id = &device.identifier;
 
-                    // Open Terminal with ADB shell command directly
-                    let _ = std::process::Command::new("open")
-                        .arg("-a")
-                        .arg("Terminal")
+                    // Use osascript to open Terminal with ADB shell command
+                    let script = format!(
+                        "tell application \"Terminal\" to do script \"{} -s {} shell\"",
+                        adb_path, device_id
+                    );
+                    
+                    let _ = std::process::Command::new("osascript")
                         .arg("-e")
-                        .arg(format!("{} -s {} shell", adb_path, device_id))
+                        .arg(script)
                         .spawn();
 
                     self.status_message = "Opened ADB shell in terminal".to_string();
