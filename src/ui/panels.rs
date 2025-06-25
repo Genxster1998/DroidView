@@ -13,6 +13,16 @@ pub enum ToolkitAction {
     RecordScreen,
     InstallApk,
     OpenShell,
+    ShowImei,
+    DisplayInfo,
+    BatteryInfo,
+}
+
+pub enum SwipeAction {
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
 pub struct SwipePanel {
@@ -48,32 +58,35 @@ impl SwipePanel {
         Self { visible: true }
     }
 
-    pub fn show(&mut self, ui: &mut Ui) {
+    pub fn show(&mut self, ui: &mut Ui) -> Option<SwipeAction> {
         if !self.visible {
-            return;
+            return None;
         }
+
+        let mut action = None;
 
         ui.group(|ui| {
             ui.heading("Swipe Controls");
 
             ui.horizontal(|ui| {
                 if ui.button("▲ Swipe Up").clicked() {
-                    // TODO: Implement swipe up
+                    action = Some(SwipeAction::Up);
                 }
                 if ui.button("▼ Swipe Down").clicked() {
-                    // TODO: Implement swipe down
+                    action = Some(SwipeAction::Down);
                 }
             });
 
             ui.horizontal(|ui| {
                 if ui.button("◀ Swipe Left").clicked() {
-                    // TODO: Implement swipe left
+                    action = Some(SwipeAction::Left);
                 }
                 if ui.button("▶ Swipe Right").clicked() {
-                    // TODO: Implement swipe right
+                    action = Some(SwipeAction::Right);
                 }
             });
         });
+        action
     }
 }
 
@@ -113,6 +126,18 @@ impl ToolkitPanel {
 
                 if ui.button("💻 ADB Shell").clicked() {
                     action = ToolkitAction::OpenShell;
+                }
+
+                if ui.button("📱 Show IMEI").clicked() {
+                    action = ToolkitAction::ShowImei;
+                }
+
+                if ui.button("📺 Display Info").clicked() {
+                    action = ToolkitAction::DisplayInfo;
+                }
+
+                if ui.button("🔋 Battery Info").clicked() {
+                    action = ToolkitAction::BatteryInfo;
                 }
             });
         });

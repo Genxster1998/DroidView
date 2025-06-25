@@ -9,6 +9,8 @@ use egui::{Color32, RichText, Ui};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, info};
+use crate::utils::is_process_running;
+use crate::ui::BottomPanelAction;
 
 pub struct DroidViewApp {
     config: Arc<Mutex<AppConfig>>,
@@ -24,6 +26,9 @@ pub struct DroidViewApp {
     status_message: String,
     scrcpy_running: bool,
     debug_disable_scrcpy: bool,
+    imei_popup: Option<String>,
+    display_popup: Option<String>,
+    battery_popup: Option<String>,
 }
 
 impl DroidViewApp {
@@ -48,6 +53,9 @@ impl DroidViewApp {
             status_message: "Initializing...".to_string(),
             scrcpy_running: false,
             debug_disable_scrcpy,
+            imei_popup: None,
+            display_popup: None,
+            battery_popup: None,
         }
     }
 
@@ -110,7 +118,6 @@ impl DroidViewApp {
     }
 
     fn update_scrcpy_status(&mut self) {
-        use crate::utils::is_process_running;
         let was_running = self.scrcpy_running;
         self.scrcpy_running = is_process_running("scrcpy");
 
@@ -221,7 +228,48 @@ impl DroidViewApp {
         if let Ok(config) = self.config.try_lock() {
             if config.panels.swipe {
                 ui.separator();
-                self.swipe_panel.show(ui);
+                if let Some(swipe_action) = self.swipe_panel.show(ui) {
+                    if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                        // Get screen size
+                        let output = std::process::Command::new(adb_bridge.path())
+                            .args(["-s", &device.identifier, "shell", "wm size"])
+                            .output();
+                        if let Ok(output) = output {
+                            if output.status.success() {
+                                let out = String::from_utf8_lossy(&output.stdout);
+                                if let Some(size_str) = out.split_whitespace().find(|s| s.contains('x')) {
+                                    let parts: Vec<&str> = size_str.split('x').collect();
+                                    if parts.len() == 2 {
+                                        if let (Ok(width), Ok(height)) = (parts[0].parse::<i32>(), parts[1].parse::<i32>()) {
+                                            // Calculate swipe coordinates
+                                            let (x1, y1, x2, y2) = match swipe_action {
+                                                crate::ui::panels::SwipeAction::Up => (width/2, (height*4)/5, width/2, height/5),
+                                                crate::ui::panels::SwipeAction::Down => (width/2, height/5, width/2, (height*4)/5),
+                                                crate::ui::panels::SwipeAction::Left => ((width*4)/5, height/2, width/5, height/2),
+                                                crate::ui::panels::SwipeAction::Right => (width/5, height/2, (width*4)/5, height/2),
+                                            };
+                                            let swipe_cmd = format!("input swipe {} {} {} {} 300", x1, y1, x2, y2);
+                                            let swipe_out = std::process::Command::new(adb_bridge.path())
+                                                .args(["-s", &device.identifier, "shell", &swipe_cmd])
+                                                .output();
+                                            if let Ok(swipe_out) = swipe_out {
+                                                if swipe_out.status.success() {
+                                                    self.status_message = "Swipe sent successfully".to_string();
+                                                } else {
+                                                    self.status_message = "Swipe command failed".to_string();
+                                                }
+                                            } else {
+                                                self.status_message = "Failed to send swipe command".to_string();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        self.status_message = "No device selected or ADB not configured".to_string();
+                    }
+                }
             }
         }
     }
@@ -461,6 +509,98 @@ impl DroidViewApp {
 
                     self.status_message = "Opened ADB shell in terminal".to_string();
                 }
+                ToolkitAction::ShowImei => {
+                    // Get IMEI using ADB shell command
+                    let output = std::process::Command::new(adb_bridge.path())
+                        .args([
+                            "-s",
+                            &device.identifier,
+                            "shell",
+                            "service call iphonesubinfo 4 | cut -c 52-66 | tr -d '.[:space:]'"
+                        ])
+                        .output();
+
+                    match output {
+                        Ok(output) if output.status.success() => {
+                            let imei = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                            if !imei.is_empty() {
+                                self.imei_popup = Some(imei);
+                                self.status_message = "IMEI retrieved successfully".to_string();
+                            } else {
+                                self.status_message = "Failed to retrieve IMEI: Empty response".to_string();
+                            }
+                        }
+                        Ok(_) => {
+                            self.status_message = "Failed to retrieve IMEI: Command failed".to_string();
+                        }
+                        Err(e) => {
+                            self.status_message = format!("Failed to retrieve IMEI: {}", e);
+                        }
+                    }
+                }
+                ToolkitAction::DisplayInfo => {
+                    // Get display information using dumpsys and wm commands
+                    let density_cmd = format!("dumpsys display | grep -E 'PhysicalDisplayInfo|density|width|height'");
+                    let wm_cmd = format!("wm size && wm density");
+                    
+                    let density_output = std::process::Command::new(adb_bridge.path())
+                        .args(["-s", &device.identifier, "shell", &density_cmd])
+                        .output();
+                    
+                    let wm_output = std::process::Command::new(adb_bridge.path())
+                        .args(["-s", &device.identifier, "shell", &wm_cmd])
+                        .output();
+
+                    let mut display_info = String::new();
+                    
+                    if let Ok(output) = density_output {
+                        if output.status.success() {
+                            display_info.push_str("📱 Display Information:\n");
+                            display_info.push_str(&String::from_utf8_lossy(&output.stdout));
+                            display_info.push_str("\n\n");
+                        }
+                    }
+                    
+                    if let Ok(output) = wm_output {
+                        if output.status.success() {
+                            display_info.push_str("📐 Window Manager Info:\n");
+                            display_info.push_str(&String::from_utf8_lossy(&output.stdout));
+                        }
+                    }
+                    
+                    if !display_info.is_empty() {
+                        self.display_popup = Some(display_info);
+                        self.status_message = "Display info retrieved successfully".to_string();
+                    } else {
+                        self.status_message = "Failed to retrieve display info".to_string();
+                    }
+                }
+                ToolkitAction::BatteryInfo => {
+                    // Get battery information using dumpsys battery
+                    let battery_cmd = format!("dumpsys battery | grep -E 'level|status|powered|temperature|voltage'");
+                    
+                    let output = std::process::Command::new(adb_bridge.path())
+                        .args(["-s", &device.identifier, "shell", &battery_cmd])
+                        .output();
+
+                    match output {
+                        Ok(output) if output.status.success() => {
+                            let battery_info = String::from_utf8_lossy(&output.stdout).to_string();
+                            if !battery_info.is_empty() {
+                                self.battery_popup = Some(battery_info);
+                                self.status_message = "Battery info retrieved successfully".to_string();
+                            } else {
+                                self.status_message = "Failed to retrieve battery info: Empty response".to_string();
+                            }
+                        }
+                        Ok(_) => {
+                            self.status_message = "Failed to retrieve battery info: Command failed".to_string();
+                        }
+                        Err(e) => {
+                            self.status_message = format!("Failed to retrieve battery info: {}", e);
+                        }
+                    }
+                }
                 ToolkitAction::None => {}
             }
         } else if let ToolkitAction::None = action {
@@ -552,7 +692,6 @@ impl eframe::App for DroidViewApp {
                     .default_height(100.0)
                     .show_inside(ui, |ui| {
                         let action = self.bottom_panel.show(ui);
-                        use crate::ui::panels::BottomPanelAction;
                         match action {
                             BottomPanelAction::RefreshDevices => self.refresh_devices(),
                             BottomPanelAction::RestartAdb => {
@@ -572,6 +711,73 @@ impl eframe::App for DroidViewApp {
                     });
             }
         });
+
+        // Show IMEI popup if available
+        if let Some(imei) = &self.imei_popup {
+            let imei_clone = imei.clone();
+            egui::Window::new("Device IMEI")
+                .collapsible(false)
+                .resizable(false)
+                .fixed_size(egui::vec2(260.0, 120.0))
+                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("📱 Device IMEI").size(12.0));
+                    ui.separator();
+                    ui.label(egui::RichText::new(&imei_clone).size(22.0).monospace());
+                    ui.separator();
+                    if ui.add(egui::Button::new(egui::RichText::new("Close").size(12.0))).clicked() {
+                        self.imei_popup = None;
+                    }
+                });
+        }
+
+        // Show Display Info popup if available
+        if let Some(display_info) = &self.display_popup {
+            let display_clone = display_info.clone();
+            egui::Window::new("Display Information")
+                .collapsible(false)
+                .resizable(true)
+                .default_size(egui::vec2(400.0, 300.0))
+                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("📺 Display Information").size(12.0));
+                    ui.separator();
+                    egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                        ui.label(egui::RichText::new(&display_clone).size(11.0).monospace());
+                    });
+                    ui.separator();
+                    if ui.add(egui::Button::new(egui::RichText::new("Close").size(12.0))).clicked() {
+                        self.display_popup = None;
+                    }
+                });
+        }
+
+        // Show Battery Info popup if available
+        if let Some(battery_info) = &self.battery_popup {
+            let battery_clone = battery_info.clone();
+            egui::Window::new("Battery Information")
+                .collapsible(false)
+                .resizable(true)
+                .default_size(egui::vec2(350.0, 250.0))
+                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("🔋 Battery Information").size(12.0));
+                    ui.separator();
+                    egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+                        ui.label(egui::RichText::new(&battery_clone).size(11.0).monospace());
+                    });
+                    ui.separator();
+                    if ui.add(egui::Button::new(egui::RichText::new("Close").size(12.0))).clicked() {
+                        self.battery_popup = None;
+                    }
+                });
+        }
 
         self.settings_window.show(ctx);
     }
