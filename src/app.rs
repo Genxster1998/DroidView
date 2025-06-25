@@ -8,9 +8,64 @@ use eframe::egui;
 use egui::{Color32, RichText, Ui};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tracing::{error, info};
 use crate::utils::is_process_running;
 use crate::ui::BottomPanelAction;
+use std::collections::HashMap;
+
+// Background task results
+#[derive(Debug)]
+enum BackgroundTaskResult {
+    AppList(Vec<(String, String)>),
+    DisableAppList(Vec<(String, String)>),
+    Imei(String),
+    DisplayInfo(String),
+    BatteryInfo(String),
+}
+
+// Wrapper types for different task results
+pub struct AppListResult(pub Vec<(String, String)>);
+pub struct DisableAppListResult(pub Vec<(String, String)>);
+pub struct ImeiResult(pub String);
+pub struct BatteryInfoResult(pub String);
+
+impl From<AppListResult> for BackgroundTaskResult {
+    fn from(result: AppListResult) -> Self {
+        BackgroundTaskResult::AppList(result.0)
+    }
+}
+
+impl From<DisableAppListResult> for BackgroundTaskResult {
+    fn from(result: DisableAppListResult) -> Self {
+        BackgroundTaskResult::DisableAppList(result.0)
+    }
+}
+
+impl From<ImeiResult> for BackgroundTaskResult {
+    fn from(result: ImeiResult) -> Self {
+        BackgroundTaskResult::Imei(result.0)
+    }
+}
+
+impl From<BatteryInfoResult> for BackgroundTaskResult {
+    fn from(result: BatteryInfoResult) -> Self {
+        BackgroundTaskResult::BatteryInfo(result.0)
+    }
+}
+
+impl From<Vec<(String, String)>> for BackgroundTaskResult {
+    fn from(apps: Vec<(String, String)>) -> Self {
+        BackgroundTaskResult::AppList(apps)
+    }
+}
+
+impl From<String> for BackgroundTaskResult {
+    fn from(info: String) -> Self {
+        BackgroundTaskResult::DisplayInfo(info)
+    }
+}
 
 pub struct DroidViewApp {
     config: Arc<Mutex<AppConfig>>,
@@ -29,6 +84,26 @@ pub struct DroidViewApp {
     imei_popup: Option<String>,
     display_popup: Option<String>,
     battery_popup: Option<String>,
+    screenrecord_dialog: bool,
+    screenrecord_duration: u32,
+    screenrecord_bitrate: u32,
+    uninstall_dialog: bool,
+    app_list: Vec<(String, String)>, // (package_name, app_name)
+    selected_apps: std::collections::HashSet<String>, // package names
+    disable_dialog: bool,
+    disable_app_list: Vec<(String, String)>, // (package_name, app_name)
+    selected_disable_apps: std::collections::HashSet<String>, // package names
+    about_dialog: bool,
+    // Async processing states
+    loading_apps: bool,
+    loading_disable_apps: bool,
+    loading_imei: bool,
+    loading_display_info: bool,
+    loading_battery_info: bool,
+    // Background task management
+    task_handles: HashMap<String, JoinHandle<()>>,
+    result_receiver: mpsc::UnboundedReceiver<BackgroundTaskResult>,
+    result_sender: mpsc::UnboundedSender<BackgroundTaskResult>,
 }
 
 impl DroidViewApp {
@@ -37,26 +112,51 @@ impl DroidViewApp {
         config: Arc<Mutex<AppConfig>>,
         debug_disable_scrcpy: bool,
     ) -> Self {
-        let settings_window = SettingsWindow::new(config.clone());
-
-        Self {
-            config,
+        let (result_sender, result_receiver) = mpsc::unbounded_channel();
+        
+        let mut app = Self {
+            config: config.clone(),
             devices: Vec::new(),
             device_list: DeviceList::new(),
             swipe_panel: SwipePanel::new(),
             toolkit_panel: ToolkitPanel::new(),
             bottom_panel: BottomPanel::new(),
             wireless_adb_panel: WirelessAdbPanel::new(),
-            settings_window,
+            settings_window: SettingsWindow::new(config.clone()),
             adb_bridge: None,
             scrcpy_bridge: None,
-            status_message: "Initializing...".to_string(),
+            status_message: String::new(),
             scrcpy_running: false,
             debug_disable_scrcpy,
             imei_popup: None,
             display_popup: None,
             battery_popup: None,
-        }
+            screenrecord_dialog: false,
+            screenrecord_duration: 10,
+            screenrecord_bitrate: 8000000,
+            uninstall_dialog: false,
+            app_list: Vec::new(),
+            selected_apps: std::collections::HashSet::new(),
+            disable_dialog: false,
+            disable_app_list: Vec::new(),
+            selected_disable_apps: std::collections::HashSet::new(),
+            about_dialog: false,
+            // Async processing states
+            loading_apps: false,
+            loading_disable_apps: false,
+            loading_imei: false,
+            loading_display_info: false,
+            loading_battery_info: false,
+            // Background task management
+            task_handles: HashMap::new(),
+            result_receiver,
+            result_sender,
+        };
+        
+        // Set config for wireless ADB panel to remember IPs
+        app.wireless_adb_panel.set_config(config);
+        
+        app
     }
 
     fn update_bridges(&mut self) {
@@ -147,6 +247,21 @@ impl DroidViewApp {
                 _ => ctx.set_visuals(egui::Visuals::default()),
             }
         }
+    }
+
+    fn run_background_task<F, T>(&mut self, task_id: String, task: F) 
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Into<BackgroundTaskResult> + Send + 'static,
+    {
+        let sender = self.result_sender.clone();
+        
+        let handle = tokio::task::spawn_blocking(move || {
+            let result = task();
+            let _ = sender.send(result.into());
+        });
+        
+        self.task_handles.insert(task_id, handle);
     }
 
     fn show_control_panel(&mut self, ui: &mut Ui) {
@@ -422,52 +537,8 @@ impl DroidViewApp {
                     }
                 }
                 ToolkitAction::RecordScreen => {
-                    // Start screenrecord (fixed 10s for demo)
-                    let status = std::process::Command::new(adb_bridge.path())
-                        .args([
-                            "-s",
-                            &device.identifier,
-                            "shell",
-                            "screenrecord",
-                            "/sdcard/video.mp4",
-                            "--time-limit",
-                            "10",
-                        ])
-                        .status();
-                    match status {
-                        Ok(s) if s.success() => {
-                            // Pull the file
-                            let desktop = dirs::desktop_dir().unwrap_or_default();
-                            let file_path = desktop.join("video.mp4");
-                            let pull_status = std::process::Command::new(adb_bridge.path())
-                                .args([
-                                    "-s",
-                                    &device.identifier,
-                                    "pull",
-                                    "/sdcard/video.mp4",
-                                    file_path.to_str().unwrap(),
-                                ])
-                                .status();
-                            match pull_status {
-                                Ok(ps) if ps.success() => {
-                                    self.status_message =
-                                        format!("Screenrecord saved to {}", file_path.display());
-                                }
-                                Ok(ps) => {
-                                    self.status_message = format!("Pull failed: exit code {}", ps);
-                                }
-                                Err(e) => {
-                                    self.status_message = format!("Pull error: {}", e);
-                                }
-                            }
-                        }
-                        Ok(s) => {
-                            self.status_message = format!("Screenrecord failed: exit code {}", s);
-                        }
-                        Err(e) => {
-                            self.status_message = format!("Screenrecord error: {}", e);
-                        }
-                    }
+                    // Show screen recording dialog
+                    self.screenrecord_dialog = true;
                 }
                 ToolkitAction::InstallApk => {
                     // Open file picker (native dialog)
@@ -510,94 +581,232 @@ impl DroidViewApp {
                     self.status_message = "Opened ADB shell in terminal".to_string();
                 }
                 ToolkitAction::ShowImei => {
-                    // Get IMEI using ADB shell command
-                    let output = std::process::Command::new(adb_bridge.path())
-                        .args([
-                            "-s",
-                            &device.identifier,
-                            "shell",
-                            "service call iphonesubinfo 4 | cut -c 52-66 | tr -d '.[:space:]'"
-                        ])
-                        .output();
+                    // Start async IMEI fetching if not already loading
+                    if !self.loading_imei && !self.task_handles.contains_key("imei") {
+                        if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                            self.loading_imei = true;
+                            let adb_path = adb_bridge.path().to_string();
+                            let device_id = device.identifier.clone();
+                            
+                            // Spawn background task
+                            self.run_background_task("imei".to_string(), move || {
+                                let output = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "service call iphonesubinfo 4 | cut -c 52-66 | tr -d '.[:space:]'"
+                                    ])
+                                    .output();
 
-                    match output {
-                        Ok(output) if output.status.success() => {
-                            let imei = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                            if !imei.is_empty() {
-                                self.imei_popup = Some(imei);
-                                self.status_message = "IMEI retrieved successfully".to_string();
-                            } else {
-                                self.status_message = "Failed to retrieve IMEI: Empty response".to_string();
-                            }
-                        }
-                        Ok(_) => {
-                            self.status_message = "Failed to retrieve IMEI: Command failed".to_string();
-                        }
-                        Err(e) => {
-                            self.status_message = format!("Failed to retrieve IMEI: {}", e);
+                                match output {
+                                    Ok(output) if output.status.success() => {
+                                        let imei = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                                        if !imei.is_empty() {
+                                            ImeiResult(imei)
+                                        } else {
+                                            ImeiResult("IMEI not available".to_string())
+                                        }
+                                    }
+                                    _ => ImeiResult("Failed to retrieve IMEI".to_string()),
+                                }
+                            });
+                            
+                            self.status_message = "Loading IMEI...".to_string();
+                        } else {
+                            self.status_message = "No device selected or ADB not configured".to_string();
                         }
                     }
                 }
                 ToolkitAction::DisplayInfo => {
-                    // Get display information using dumpsys and wm commands
-                    let density_cmd = format!("dumpsys display | grep -E 'PhysicalDisplayInfo|density|width|height'");
-                    let wm_cmd = format!("wm size && wm density");
-                    
-                    let density_output = std::process::Command::new(adb_bridge.path())
-                        .args(["-s", &device.identifier, "shell", &density_cmd])
-                        .output();
-                    
-                    let wm_output = std::process::Command::new(adb_bridge.path())
-                        .args(["-s", &device.identifier, "shell", &wm_cmd])
-                        .output();
+                    // Start async display info fetching if not already loading
+                    if !self.loading_display_info && !self.task_handles.contains_key("display_info") {
+                        if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                            self.loading_display_info = true;
+                            let adb_path = adb_bridge.path().to_string();
+                            let device_id = device.identifier.clone();
+                            
+                            // Spawn background task
+                            self.run_background_task("display_info".to_string(), move || {
+                                let mut display_info = String::new();
+                                
+                                // Get dumpsys display info
+                                let dumpsys_output = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "dumpsys display | grep -E 'Flags|Display.*:|location'"
+                                    ])
+                                    .output();
 
-                    let mut display_info = String::new();
-                    
-                    if let Ok(output) = density_output {
-                        if output.status.success() {
-                            display_info.push_str("📱 Display Information:\n");
-                            display_info.push_str(&String::from_utf8_lossy(&output.stdout));
-                            display_info.push_str("\n\n");
+                                if let Ok(output) = dumpsys_output {
+                                    if output.status.success() {
+                                        display_info.push_str("📱 Display Information:\n");
+                                        display_info.push_str(&String::from_utf8_lossy(&output.stdout));
+                                        display_info.push_str("\n\n");
+                                    }
+                                }
+
+                                // Get wm size info
+                                let wm_size_output = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "wm size"
+                                    ])
+                                    .output();
+
+                                if let Ok(output) = wm_size_output {
+                                    if output.status.success() {
+                                        display_info.push_str("📐 Window Manager Size:\n");
+                                        display_info.push_str(&String::from_utf8_lossy(&output.stdout));
+                                        display_info.push_str("\n\n");
+                                    }
+                                }
+
+                                // Get wm density info
+                                let wm_density_output = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "wm density"
+                                    ])
+                                    .output();
+
+                                if let Ok(output) = wm_density_output {
+                                    if output.status.success() {
+                                        display_info.push_str("📊 Window Manager Density:\n");
+                                        display_info.push_str(&String::from_utf8_lossy(&output.stdout));
+                                    }
+                                }
+
+                                if !display_info.is_empty() {
+                                    display_info
+                                } else {
+                                    "Failed to retrieve display info".to_string()
+                                }
+                            });
+                            
+                            self.status_message = "Loading display info...".to_string();
+                        } else {
+                            self.status_message = "No device selected or ADB not configured".to_string();
                         }
-                    }
-                    
-                    if let Ok(output) = wm_output {
-                        if output.status.success() {
-                            display_info.push_str("📐 Window Manager Info:\n");
-                            display_info.push_str(&String::from_utf8_lossy(&output.stdout));
-                        }
-                    }
-                    
-                    if !display_info.is_empty() {
-                        self.display_popup = Some(display_info);
-                        self.status_message = "Display info retrieved successfully".to_string();
-                    } else {
-                        self.status_message = "Failed to retrieve display info".to_string();
                     }
                 }
                 ToolkitAction::BatteryInfo => {
-                    // Get battery information using dumpsys battery
-                    let battery_cmd = format!("dumpsys battery | grep -E 'level|status|powered|temperature|voltage'");
-                    
-                    let output = std::process::Command::new(adb_bridge.path())
-                        .args(["-s", &device.identifier, "shell", &battery_cmd])
-                        .output();
+                    // Start async battery info fetching if not already loading
+                    if !self.loading_battery_info && !self.task_handles.contains_key("battery_info") {
+                        if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                            self.loading_battery_info = true;
+                            let adb_path = adb_bridge.path().to_string();
+                            let device_id = device.identifier.clone();
+                            
+                            // Spawn background task
+                            self.run_background_task("battery_info".to_string(), move || {
+                                let output = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "dumpsys battery"
+                                    ])
+                                    .output();
 
-                    match output {
-                        Ok(output) if output.status.success() => {
-                            let battery_info = String::from_utf8_lossy(&output.stdout).to_string();
-                            if !battery_info.is_empty() {
-                                self.battery_popup = Some(battery_info);
-                                self.status_message = "Battery info retrieved successfully".to_string();
-                            } else {
-                                self.status_message = "Failed to retrieve battery info: Empty response".to_string();
-                            }
+                                match output {
+                                    Ok(output) if output.status.success() => {
+                                        let output_str = String::from_utf8_lossy(&output.stdout);
+                                        BatteryInfoResult(output_str.to_string())
+                                    }
+                                    _ => BatteryInfoResult("Failed to retrieve battery info".to_string()),
+                                }
+                            });
+                            
+                            self.status_message = "Loading battery info...".to_string();
+                        } else {
+                            self.status_message = "No device selected or ADB not configured".to_string();
                         }
-                        Ok(_) => {
-                            self.status_message = "Failed to retrieve battery info: Command failed".to_string();
+                    }
+                }
+                ToolkitAction::UninstallApp => {
+                    // Start async app list fetching if not already loading
+                    if !self.loading_apps && !self.task_handles.contains_key("app_list") {
+                        if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                            self.loading_apps = true;
+                            let adb_path = adb_bridge.path().to_string();
+                            let device_id = device.identifier.clone();
+                            
+                            // Spawn background task
+                            self.run_background_task("app_list".to_string(), move || {
+                                let output = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "pm list packages -3"
+                                    ])
+                                    .output();
+
+                                match output {
+                                    Ok(output) if output.status.success() => {
+                                        let mut apps = Vec::new();
+                                        for line in String::from_utf8_lossy(&output.stdout).lines() {
+                                            if line.starts_with("package:") {
+                                                let package_name = line.replace("package:", "").trim().to_string();
+                                                apps.push((package_name.clone(), package_name));
+                                            }
+                                        }
+                                        AppListResult(apps)
+                                    }
+                                    _ => AppListResult(Vec::new()),
+                                }
+                            });
+                            
+                            self.status_message = "Loading app list...".to_string();
+                        } else {
+                            self.status_message = "No device selected or ADB not configured".to_string();
                         }
-                        Err(e) => {
-                            self.status_message = format!("Failed to retrieve battery info: {}", e);
+                    }
+                }
+                ToolkitAction::DisableApp => {
+                    // Start async disable app list fetching if not already loading
+                    if !self.loading_disable_apps && !self.task_handles.contains_key("disable_app_list") {
+                        if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                            self.loading_disable_apps = true;
+                            let adb_path = adb_bridge.path().to_string();
+                            let device_id = device.identifier.clone();
+                            
+                            // Spawn background task
+                            self.run_background_task("disable_app_list".to_string(), move || {
+                                let output = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "pm list packages -e"
+                                    ])
+                                    .output();
+
+                                match output {
+                                    Ok(output) if output.status.success() => {
+                                        let mut apps = Vec::new();
+                                        for line in String::from_utf8_lossy(&output.stdout).lines() {
+                                            if line.starts_with("package:") {
+                                                let package_name = line.replace("package:", "").trim().to_string();
+                                                apps.push((package_name.clone(), package_name));
+                                            }
+                                        }
+                                        DisableAppListResult(apps)
+                                    }
+                                    _ => DisableAppListResult(Vec::new()),
+                                }
+                            });
+                            
+                            self.status_message = "Loading app list...".to_string();
+                        } else {
+                            self.status_message = "No device selected or ADB not configured".to_string();
                         }
                     }
                 }
@@ -607,6 +816,69 @@ impl DroidViewApp {
             // do nothing
         } else {
             self.status_message = "No device selected or ADB not configured".to_string();
+        }
+    }
+
+    fn update_background_tasks(&mut self) {
+        // Check for completed tasks
+        while let Ok(result) = self.result_receiver.try_recv() {
+            match result {
+                BackgroundTaskResult::AppList(apps) => {
+                    self.loading_apps = false;
+                    self.app_list = apps;
+                    self.uninstall_dialog = true;
+                    self.status_message = "App list loaded successfully".to_string();
+                }
+                BackgroundTaskResult::DisableAppList(apps) => {
+                    self.loading_disable_apps = false;
+                    self.disable_app_list = apps;
+                    self.disable_dialog = true;
+                    self.status_message = "App list loaded successfully".to_string();
+                }
+                BackgroundTaskResult::Imei(imei) => {
+                    self.loading_imei = false;
+                    self.imei_popup = Some(imei);
+                    self.status_message = "IMEI retrieved successfully".to_string();
+                }
+                BackgroundTaskResult::DisplayInfo(info) => {
+                    self.loading_display_info = false;
+                    self.display_popup = Some(info);
+                    self.status_message = "Display info retrieved successfully".to_string();
+                }
+                BackgroundTaskResult::BatteryInfo(info) => {
+                    self.loading_battery_info = false;
+                    self.battery_popup = Some(info);
+                    self.status_message = "Battery info retrieved successfully".to_string();
+                }
+            }
+        }
+
+        // Clean up completed tasks
+        self.task_handles.retain(|_, handle| !handle.is_finished());
+    }
+
+    fn is_processing(&self) -> bool {
+        self.loading_apps || self.loading_disable_apps || self.loading_imei || self.loading_display_info || self.loading_battery_info
+    }
+
+    fn toggle_theme(&mut self, ctx: &egui::Context) {
+        if let Ok(mut config) = self.config.try_lock() {
+            match config.theme.as_str() {
+                "dark" => {
+                    config.theme = "light".to_string();
+                    ctx.set_visuals(egui::Visuals::light());
+                }
+                "light" => {
+                    config.theme = "dark".to_string();
+                    ctx.set_visuals(egui::Visuals::dark());
+                }
+                _ => {
+                    config.theme = "dark".to_string();
+                    ctx.set_visuals(egui::Visuals::dark());
+                }
+            }
+            // Save the theme change
+            let _ = config.save();
         }
     }
 }
@@ -671,15 +943,64 @@ impl eframe::App for DroidViewApp {
         // Right panel (toolkit)
         let available_width = ctx.available_rect().width();
         let right_panel_default_width = available_width * 0.3;
-        let right_panel_width = right_panel_default_width.max(300.0);
+        let right_panel_width = right_panel_default_width.max(200.0);
         if self.toolkit_panel.visible {
+            use crate::ui::panels::ToolkitLoadingState;
+            let loading = ToolkitLoadingState {
+                screenshot: false,
+                record_screen: false,
+                install_apk: false,
+                open_shell: false,
+                show_imei: self.loading_imei,
+                display_info: self.loading_display_info,
+                battery_info: self.loading_battery_info,
+                uninstall_app: self.loading_apps,
+                disable_app: self.loading_disable_apps,
+            };
             egui::SidePanel::right("toolkit_panel")
                 .resizable(true)
                 .default_width(right_panel_width)
                 .min_width(180.0)
                 .show(ctx, |ui| {
-                    let toolkit_action = self.toolkit_panel.show(ui);
+                    let toolkit_action = self.toolkit_panel.show(ui, &loading);
                     self.handle_toolkit_action(toolkit_action);
+                    
+                    // Add processing status at the bottom of the right panel
+                    if self.is_processing() {
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            ui.add(egui::Spinner::new().size(16.0));
+                            ui.label(egui::RichText::new("Processing...").size(13.0).color(Color32::YELLOW));
+                        });
+                    }
+                    
+                    // Theme switch and About button
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        // Theme toggle button
+                        let current_theme = if let Ok(config) = self.config.try_lock() {
+                            config.theme.clone()
+                        } else {
+                            "default".to_string()
+                        };
+                        
+                        let theme_text = match current_theme.as_str() {
+                            "dark" => "🌙 Dark",
+                            "light" => "☀️ Light",
+                            _ => "🌙 Dark"
+                        };
+                        
+                        if ui.button(egui::RichText::new(theme_text).size(12.0)).clicked() {
+                            self.toggle_theme(ctx);
+                        }
+                        
+                        ui.separator();
+                        
+                        // About button
+                        if ui.button(egui::RichText::new("ℹ️ About").size(12.0)).clicked() {
+                            self.about_dialog = true;
+                        }
+                    });
                 });
         }
 
@@ -779,6 +1100,415 @@ impl eframe::App for DroidViewApp {
                 });
         }
 
+        // Show Screen Recording Dialog if available
+        if self.screenrecord_dialog {
+            egui::Window::new("Screen Recording Settings")
+                .collapsible(false)
+                .resizable(false)
+                .fixed_size(egui::vec2(300.0, 200.0))
+                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("🎥 Screen Recording Settings").size(12.0));
+                    ui.separator();
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Duration (seconds):");
+                        ui.add(egui::DragValue::new(&mut self.screenrecord_duration).clamp_range(1..=180).speed(1));
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Bitrate (KB/s):");
+                        ui.add(egui::DragValue::new(&mut self.screenrecord_bitrate).clamp_range(100..=10000).speed(100));
+                    });
+                    
+                    ui.separator();
+                    
+                    ui.horizontal(|ui| {
+                        if ui.add(egui::Button::new(egui::RichText::new("Start Recording").size(12.0))).clicked() {
+                            if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                                // Start screen recording with custom settings
+                                let status = std::process::Command::new(adb_bridge.path())
+                                    .args([
+                                        "-s",
+                                        &device.identifier,
+                                        "shell",
+                                        "screenrecord",
+                                        "/sdcard/video.mp4",
+                                        "--time-limit",
+                                        &self.screenrecord_duration.to_string(),
+                                        "--bit-rate",
+                                        &(self.screenrecord_bitrate * 1000).to_string(),
+                                    ])
+                                    .status();
+                                match status {
+                                    Ok(s) if s.success() => {
+                                        // Pull the file
+                                        let desktop = dirs::desktop_dir().unwrap_or_default();
+                                        let file_path = desktop.join("video.mp4");
+                                        let pull_status = std::process::Command::new(adb_bridge.path())
+                                            .args([
+                                                "-s",
+                                                &device.identifier,
+                                                "pull",
+                                                "/sdcard/video.mp4",
+                                                file_path.to_str().unwrap(),
+                                            ])
+                                            .status();
+                                        match pull_status {
+                                            Ok(ps) if ps.success() => {
+                                                self.status_message = format!("Screenrecord saved to {}", file_path.display());
+                                            }
+                                            Ok(ps) => {
+                                                self.status_message = format!("Pull failed: exit code {}", ps);
+                                            }
+                                            Err(e) => {
+                                                self.status_message = format!("Pull error: {}", e);
+                                            }
+                                        }
+                                    }
+                                    Ok(s) => {
+                                        self.status_message = format!("Screenrecord failed: exit code {}", s);
+                                    }
+                                    Err(e) => {
+                                        self.status_message = format!("Screenrecord error: {}", e);
+                                    }
+                                }
+                                self.screenrecord_dialog = false;
+                            } else {
+                                self.status_message = "No device selected or ADB not configured".to_string();
+                            }
+                        }
+                        
+                        if ui.add(egui::Button::new(egui::RichText::new("Cancel").size(12.0))).clicked() {
+                            self.screenrecord_dialog = false;
+                        }
+                    });
+                });
+        }
+
+        // Show About Dialog if available
+        if self.about_dialog {
+            egui::Area::new("about_dialog")
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .show(ctx, |ui| {
+                    egui::Frame::popup(ui.style())
+                        .show(ui, |ui| {
+                            ui.set_width(280.0);
+                            ui.set_height(180.0);
+                            
+                            ui.vertical_centered(|ui| {
+                                ui.add_space(8.0);
+                                
+                                // App icon
+                                let icon_path = std::path::Path::new("assets/icon.png");
+                                if let Ok(img) = image::open(icon_path) {
+                                    let img = img.to_rgba8();
+                                    let (w, h) = img.dimensions();
+                                    let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                                        [w as usize, h as usize],
+                                        img.as_raw(),
+                                    );
+                                    let texture_id = ui.ctx().load_texture(
+                                        "about_icon",
+                                        color_image,
+                                        egui::TextureOptions::default()
+                                    );
+                                    ui.add(egui::Image::new(&texture_id).fit_to_exact_size(egui::vec2(48.0, 48.0)));
+                                    ui.add_space(8.0);
+                                } else {
+                                    // Fallback to emoji if icon not found
+                                    ui.label(egui::RichText::new("📱").size(32.0));
+                                }
+                                
+                                // App name and version
+                                ui.label(egui::RichText::new("DroidView").size(20.0).strong());
+                                ui.label(egui::RichText::new("(droid_view)").size(10.0).color(Color32::GRAY));
+                                ui.label(egui::RichText::new("Version 0.1.0").size(12.0));
+                                
+                                ui.add_space(8.0);
+                                
+                                // Author
+                                ui.label(egui::RichText::new("Author: Genxster1998").size(11.0));
+                                
+                                ui.add_space(4.0);
+                                
+                                // Copyright
+                                ui.label(egui::RichText::new("© 2024 Genxster1998").size(10.0).color(Color32::GRAY));
+                                
+                                ui.add_space(8.0);
+                                
+                                // Website
+                                ui.vertical_centered(|ui| {
+                                    ui.label(egui::RichText::new("Website:").size(10.0));
+                                    if ui.link(egui::RichText::new("github.com/Genxster1998/DroidView").size(10.0).color(Color32::BLUE)).clicked() {
+                                        // Open URL in default browser
+                                        let _ = std::process::Command::new("open")
+                                            .arg("https://github.com/Genxster1998/DroidView")
+                                            .output();
+                                    }
+                                });
+                                
+                                ui.add_space(12.0);
+                                
+                                // Close button
+                                if ui.add(egui::Button::new(egui::RichText::new("Close").size(11.0)).min_size(egui::vec2(60.0, 24.0))).clicked() {
+                                    self.about_dialog = false;
+                                }
+                            });
+                        });
+                });
+        }
+
+        // Show Uninstall App Dialog if available
+        if self.uninstall_dialog {
+            egui::Window::new("Uninstall Application")
+                .collapsible(false)
+                .resizable(true)
+                .default_size(egui::vec2(400.0, 500.0))
+                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("🗑️ Uninstall Application").size(12.0));
+                    ui.separator();
+                    
+                    if self.loading_apps {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(20.0);
+                            ui.label("Loading app list...");
+                            ui.add(egui::Spinner::new().size(20.0));
+                            ui.add_space(20.0);
+                        });
+                    } else if self.app_list.is_empty() {
+                        ui.label("No apps found or failed to load app list.");
+                    } else {
+                        ui.label(format!("Found {} apps:", self.app_list.len()));
+                        ui.separator();
+                        
+                        // App selection with checkboxes
+                        egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
+                            for (package_name, _) in &self.app_list {
+                                let is_selected = self.selected_apps.contains(package_name);
+                                let mut checked = is_selected;
+                                
+                                ui.horizontal(|ui| {
+                                    if ui.checkbox(&mut checked, "").clicked() {
+                                        if checked {
+                                            self.selected_apps.insert(package_name.clone());
+                                        } else {
+                                            self.selected_apps.remove(package_name);
+                                        }
+                                    }
+                                    
+                                    ui.label(package_name);
+                                });
+                            }
+                        });
+                        
+                        ui.separator();
+                        
+                        // Selection summary
+                        if !self.selected_apps.is_empty() {
+                            ui.label(format!("Selected {} app(s)", self.selected_apps.len()));
+                        }
+                        
+                        // Uninstall buttons
+                        ui.horizontal(|ui| {
+                            if ui.add(egui::Button::new(egui::RichText::new("Uninstall Selected").size(12.0))).clicked() {
+                                if !self.selected_apps.is_empty() {
+                                    if let (Some(adb_bridge), Some(device)) = (
+                                        self.adb_bridge.as_ref(), 
+                                        self.device_list.selected_device()
+                                    ) {
+                                        let mut success_count = 0;
+                                        let mut failed_count = 0;
+                                        
+                                        for package_name in &self.selected_apps {
+                                            // Uninstall the selected app
+                                            let status = std::process::Command::new(adb_bridge.path())
+                                                .args([
+                                                    "-s",
+                                                    &device.identifier,
+                                                    "uninstall",
+                                                    package_name,
+                                                ])
+                                                .status();
+                                            
+                                            match status {
+                                                Ok(s) if s.success() => {
+                                                    success_count += 1;
+                                                }
+                                                _ => {
+                                                    failed_count += 1;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Remove successfully uninstalled apps from list
+                                        self.app_list.retain(|(package, _)| !self.selected_apps.contains(package));
+                                        
+                                        if failed_count == 0 {
+                                            self.status_message = format!("Successfully uninstalled {} app(s)", success_count);
+                                        } else {
+                                            self.status_message = format!("Uninstalled {} app(s), {} failed", success_count, failed_count);
+                                        }
+                                        
+                                        self.selected_apps.clear();
+                                    } else {
+                                        self.status_message = "No device selected or ADB not configured".to_string();
+                                    }
+                                } else {
+                                    self.status_message = "Please select at least one app to uninstall".to_string();
+                                }
+                            }
+                            
+                            if ui.add(egui::Button::new(egui::RichText::new("Select All").size(12.0))).clicked() {
+                                self.selected_apps.clear();
+                                for (package_name, _) in &self.app_list {
+                                    self.selected_apps.insert(package_name.clone());
+                                }
+                            }
+                            
+                            if ui.add(egui::Button::new(egui::RichText::new("Clear Selection").size(12.0))).clicked() {
+                                self.selected_apps.clear();
+                            }
+                            
+                            if ui.add(egui::Button::new(egui::RichText::new("Close").size(12.0))).clicked() {
+                                self.uninstall_dialog = false;
+                                self.selected_apps.clear();
+                            }
+                        });
+                    }
+                });
+        }
+
+        // Show Disable App Dialog if available
+        if self.disable_dialog {
+            egui::Window::new("Disable Application")
+                .collapsible(false)
+                .resizable(true)
+                .default_size(egui::vec2(400.0, 500.0))
+                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("🚫 Disable Application").size(12.0));
+                    ui.separator();
+                    
+                    if self.loading_disable_apps {
+                        ui.vertical_centered(|ui| {
+                            ui.add_space(20.0);
+                            ui.label("Loading app list...");
+                            ui.add(egui::Spinner::new().size(20.0));
+                            ui.add_space(20.0);
+                        });
+                    } else if self.disable_app_list.is_empty() {
+                        ui.label("No apps found or failed to load app list.");
+                    } else {
+                        ui.label(format!("Found {} enabled apps:", self.disable_app_list.len()));
+                        ui.separator();
+                        
+                        // App selection with checkboxes
+                        egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
+                            for (package_name, _) in &self.disable_app_list {
+                                let is_selected = self.selected_disable_apps.contains(package_name);
+                                let mut checked = is_selected;
+                                
+                                ui.horizontal(|ui| {
+                                    if ui.checkbox(&mut checked, "").clicked() {
+                                        if checked {
+                                            self.selected_disable_apps.insert(package_name.clone());
+                                        } else {
+                                            self.selected_disable_apps.remove(package_name);
+                                        }
+                                    }
+                                    
+                                    ui.label(package_name);
+                                });
+                            }
+                        });
+                        
+                        ui.separator();
+                        
+                        // Selection summary
+                        if !self.selected_disable_apps.is_empty() {
+                            ui.label(format!("Selected {} app(s)", self.selected_disable_apps.len()));
+                        }
+                        
+                        // Disable buttons
+                        ui.horizontal(|ui| {
+                            if ui.add(egui::Button::new(egui::RichText::new("Disable Selected").size(12.0))).clicked() {
+                                if !self.selected_disable_apps.is_empty() {
+                                    if let (Some(adb_bridge), Some(device)) = (
+                                        self.adb_bridge.as_ref(), 
+                                        self.device_list.selected_device()
+                                    ) {
+                                        let mut success_count = 0;
+                                        let mut failed_count = 0;
+                                        
+                                        for package_name in &self.selected_disable_apps {
+                                            // Disable the selected app for user 0
+                                            let status = std::process::Command::new(adb_bridge.path())
+                                                .args([
+                                                    "-s",
+                                                    &device.identifier,
+                                                    "shell",
+                                                    "pm disable-user --user 0",
+                                                    package_name,
+                                                ])
+                                                .status();
+                                            
+                                            match status {
+                                                Ok(s) if s.success() => {
+                                                    success_count += 1;
+                                                }
+                                                _ => {
+                                                    failed_count += 1;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Remove successfully disabled apps from list
+                                        self.disable_app_list.retain(|(package, _)| !self.selected_disable_apps.contains(package));
+                                        
+                                        if failed_count == 0 {
+                                            self.status_message = format!("Successfully disabled {} app(s)", success_count);
+                                        } else {
+                                            self.status_message = format!("Disabled {} app(s), {} failed", success_count, failed_count);
+                                        }
+                                        
+                                        self.selected_disable_apps.clear();
+                                    } else {
+                                        self.status_message = "No device selected or ADB not configured".to_string();
+                                    }
+                                } else {
+                                    self.status_message = "Please select at least one app to disable".to_string();
+                                }
+                            }
+                            
+                            if ui.add(egui::Button::new(egui::RichText::new("Select All").size(12.0))).clicked() {
+                                self.selected_disable_apps.clear();
+                                for (package_name, _) in &self.disable_app_list {
+                                    self.selected_disable_apps.insert(package_name.clone());
+                                }
+                            }
+                            
+                            if ui.add(egui::Button::new(egui::RichText::new("Clear Selection").size(12.0))).clicked() {
+                                self.selected_disable_apps.clear();
+                            }
+                            
+                            if ui.add(egui::Button::new(egui::RichText::new("Close").size(12.0))).clicked() {
+                                self.disable_dialog = false;
+                                self.selected_disable_apps.clear();
+                            }
+                        });
+                    }
+                });
+        }
+
+        self.update_background_tasks();
         self.settings_window.show(ctx);
     }
 }
