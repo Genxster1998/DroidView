@@ -13,6 +13,7 @@ pub enum ToolkitAction {
     RecordScreen,
     InstallApk,
     FileManager,
+    OpenShell,
 }
 
 pub struct SwipePanel {
@@ -113,6 +114,10 @@ impl ToolkitPanel {
 
                 if ui.button("📁 File Manager").clicked() {
                     action = ToolkitAction::FileManager;
+                }
+
+                if ui.button("💻 ADB Shell").clicked() {
+                    action = ToolkitAction::OpenShell;
                 }
             });
         });
