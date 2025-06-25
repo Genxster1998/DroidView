@@ -443,24 +443,6 @@ impl DroidViewApp {
                         }
                     }
                 }
-                ToolkitAction::FileManager => {
-                    // Open device shell directly in terminal (macOS approach)
-                    let adb_path = adb_bridge.path();
-                    let device_id = &device.identifier;
-
-                    // Open Terminal with ADB shell command directly
-                    let _ = std::process::Command::new("open")
-                        .arg("-a")
-                        .arg("Terminal")
-                        .arg("-e")
-                        .arg(adb_path)
-                        .arg("-s")
-                        .arg(device_id)
-                        .arg("shell")
-                        .spawn();
-
-                    self.status_message = "Opened device shell in terminal".to_string();
-                }
                 ToolkitAction::OpenShell => {
                     // Open ADB shell directly in terminal (macOS approach)
                     let adb_path = adb_bridge.path();
@@ -471,10 +453,7 @@ impl DroidViewApp {
                         .arg("-a")
                         .arg("Terminal")
                         .arg("-e")
-                        .arg(adb_path)
-                        .arg("-s")
-                        .arg(device_id)
-                        .arg("shell")
+                        .arg(format!("{} -s {} shell", adb_path, device_id))
                         .spawn();
 
                     self.status_message = "Opened ADB shell in terminal".to_string();

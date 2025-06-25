@@ -12,7 +12,6 @@ pub enum ToolkitAction {
     Screenshot,
     RecordScreen,
     InstallApk,
-    FileManager,
     OpenShell,
 }
 
@@ -110,10 +109,6 @@ impl ToolkitPanel {
 
                 if ui.button("📱 Install APK").clicked() {
                     action = ToolkitAction::InstallApk;
-                }
-
-                if ui.button("📁 File Manager").clicked() {
-                    action = ToolkitAction::FileManager;
                 }
 
                 if ui.button("💻 ADB Shell").clicked() {
