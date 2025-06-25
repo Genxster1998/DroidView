@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub extra_args: String,
     pub panels: PanelConfig,
     pub theme: String,
+    pub wireless_adb: WirelessAdbConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +25,14 @@ pub struct PanelConfig {
     pub swipe: bool,
     pub toolkit: bool,
     pub bottom: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WirelessAdbConfig {
+    pub last_tcpip_ip: String,
+    pub last_tcpip_port: String,
+    pub last_pairing_ip: String,
+    pub last_pairing_port: String,
 }
 
 impl Default for AppConfig {
@@ -44,6 +53,12 @@ impl Default for AppConfig {
                 bottom: true,
             },
             theme: "default".to_string(),
+            wireless_adb: WirelessAdbConfig {
+                last_tcpip_ip: String::new(),
+                last_tcpip_port: "5555".to_string(),
+                last_pairing_ip: String::new(),
+                last_pairing_port: "5555".to_string(),
+            },
         }
     }
 }

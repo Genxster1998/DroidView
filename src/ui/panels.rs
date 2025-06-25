@@ -16,6 +16,8 @@ pub enum ToolkitAction {
     ShowImei,
     DisplayInfo,
     BatteryInfo,
+    UninstallApp,
+    DisableApp,
 }
 
 pub enum SwipeAction {
@@ -45,6 +47,7 @@ pub struct WirelessAdbPanel {
     pairing_port: String,
     pairing_code: String,
     selected_device: Option<String>,
+    config: Option<std::sync::Arc<tokio::sync::Mutex<crate::config::AppConfig>>>,
 }
 
 impl Default for SwipePanel {
@@ -101,7 +104,7 @@ impl ToolkitPanel {
         Self { visible: true }
     }
 
-    pub fn show(&mut self, ui: &mut Ui) -> ToolkitAction {
+    pub fn show(&mut self, ui: &mut Ui, loading: &ToolkitLoadingState) -> ToolkitAction {
         if !self.visible {
             return ToolkitAction::None;
         }
@@ -109,40 +112,141 @@ impl ToolkitPanel {
         let mut action = ToolkitAction::None;
 
         ui.group(|ui| {
-            ui.heading("Toolkit");
+            ui.vertical_centered(|ui| {
+                ui.heading("Toolkit");
+            });
 
-            ui.vertical(|ui| {
-                if ui.button("📸 Screenshot").clicked() {
-                    action = ToolkitAction::Screenshot;
-                }
+            ui.vertical_centered(|ui| {
+                // Screenshot button
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("📸 Screenshot").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::Screenshot;
+                    }
+                });
 
-                if ui.button("🎥 Record Screen").clicked() {
-                    action = ToolkitAction::RecordScreen;
-                }
+                // Record Screen button
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("🎥 Record Screen").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::RecordScreen;
+                    }
+                });
 
-                if ui.button("📱 Install APK").clicked() {
-                    action = ToolkitAction::InstallApk;
-                }
+                // Install APK button
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("📱 Install APK").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::InstallApk;
+                    }
+                });
 
-                if ui.button("💻 ADB Shell").clicked() {
-                    action = ToolkitAction::OpenShell;
-                }
+                // ADB Shell button
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("💻 ADB Shell").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::OpenShell;
+                    }
+                });
 
-                if ui.button("📱 Show IMEI").clicked() {
-                    action = ToolkitAction::ShowImei;
-                }
+                // Show IMEI button with spinner
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("📱 Show IMEI").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::ShowImei;
+                    }
+                    if loading.show_imei {
+                        ui.add(egui::Spinner::new().size(16.0));
+                    }
+                });
 
-                if ui.button("📺 Display Info").clicked() {
-                    action = ToolkitAction::DisplayInfo;
-                }
+                // Show Display Info button with spinner
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("📺 Display Info").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::DisplayInfo;
+                    }
+                    if loading.display_info {
+                        ui.add(egui::Spinner::new().size(16.0));
+                    }
+                });
 
-                if ui.button("🔋 Battery Info").clicked() {
-                    action = ToolkitAction::BatteryInfo;
-                }
+                // Show Battery Info button with spinner
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("🔋 Battery Info").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::BatteryInfo;
+                    }
+                    if loading.battery_info {
+                        ui.add(egui::Spinner::new().size(16.0));
+                    }
+                });
+
+                // Show Uninstall App button with spinner
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("🗑️ Uninstall App").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::UninstallApp;
+                    }
+                    if loading.uninstall_app {
+                        ui.add(egui::Spinner::new().size(16.0));
+                    }
+                });
+
+                // Show Disable App button with spinner
+                ui.vertical_centered(|ui| {
+                    if ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("🚫 Disable App").size(13.0)
+                        ).min_size(egui::vec2(120.0, 28.0))
+                    ).clicked() {
+                        action = ToolkitAction::DisableApp;
+                    }
+                    if loading.disable_app {
+                        ui.add(egui::Spinner::new().size(16.0));
+                    }
+                });
             });
         });
         action
     }
+}
+
+// Helper struct for loading states
+pub struct ToolkitLoadingState {
+    pub screenshot: bool,
+    pub record_screen: bool,
+    pub install_apk: bool,
+    pub open_shell: bool,
+    pub show_imei: bool,
+    pub display_info: bool,
+    pub battery_info: bool,
+    pub uninstall_app: bool,
+    pub disable_app: bool,
 }
 
 impl Default for BottomPanel {
@@ -201,6 +305,31 @@ impl WirelessAdbPanel {
             pairing_port: "5555".to_string(),
             pairing_code: String::new(),
             selected_device: None,
+            config: None,
+        }
+    }
+
+    pub fn set_config(&mut self, config: std::sync::Arc<tokio::sync::Mutex<crate::config::AppConfig>>) {
+        self.config = Some(config.clone());
+        // Load remembered IPs
+        if let Ok(config_lock) = config.try_lock() {
+            self.tcpip_ip = config_lock.wireless_adb.last_tcpip_ip.clone();
+            self.tcpip_port = config_lock.wireless_adb.last_tcpip_port.clone();
+            self.pairing_ip = config_lock.wireless_adb.last_pairing_ip.clone();
+            self.pairing_port = config_lock.wireless_adb.last_pairing_port.clone();
+        }
+    }
+
+    fn save_ips(&mut self) {
+        if let Some(config) = &self.config {
+            if let Ok(mut config_lock) = config.try_lock() {
+                config_lock.wireless_adb.last_tcpip_ip = self.tcpip_ip.clone();
+                config_lock.wireless_adb.last_tcpip_port = self.tcpip_port.clone();
+                config_lock.wireless_adb.last_pairing_ip = self.pairing_ip.clone();
+                config_lock.wireless_adb.last_pairing_port = self.pairing_port.clone();
+                // Save config
+                let _ = config_lock.save();
+            }
         }
     }
 
@@ -235,6 +364,7 @@ impl WirelessAdbPanel {
 
                 if ui.button("🔗 Connect").clicked() {
                     if let Ok(port) = self.tcpip_port.parse::<u16>() {
+                        self.save_ips(); // Save IPs when connecting
                         action = Some(WirelessAdbAction::Connect {
                             ip: self.tcpip_ip.clone(),
                             port,
@@ -307,6 +437,7 @@ impl WirelessAdbPanel {
 
                 if ui.button("🔐 Pair").clicked() {
                     if let Ok(port) = self.pairing_port.parse::<u16>() {
+                        self.save_ips(); // Save IPs when pairing
                         action = Some(WirelessAdbAction::Pair {
                             ip: self.pairing_ip.clone(),
                             port,
