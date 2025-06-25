@@ -444,68 +444,40 @@ impl DroidViewApp {
                     }
                 }
                 ToolkitAction::FileManager => {
-                    // Open device shell in terminal (macOS approach)
+                    // Open device shell directly in terminal (macOS approach)
                     let adb_path = adb_bridge.path();
                     let device_id = &device.identifier;
 
-                    // Create a temporary script to run the ADB shell
-                    let temp_dir = std::env::temp_dir();
-                    let script_path = temp_dir.join("adb_shell.sh");
-                    let script_content = format!(
-                        "#!/bin/bash\necho 'Starting ADB shell for device: {}'\n{} -s {} shell\necho 'ADB shell closed'\nread -p 'Press Enter to close...'",
-                        device_id, adb_path, device_id
-                    );
+                    // Open Terminal with ADB shell command directly
+                    let _ = std::process::Command::new("open")
+                        .arg("-a")
+                        .arg("Terminal")
+                        .arg("-e")
+                        .arg(adb_path)
+                        .arg("-s")
+                        .arg(device_id)
+                        .arg("shell")
+                        .spawn();
 
-                    if std::fs::write(&script_path, script_content).is_ok() {
-                        // Make the script executable
-                        let _ = std::process::Command::new("chmod")
-                            .arg("+x")
-                            .arg(&script_path)
-                            .status();
-
-                        // Open Terminal with the script
-                        let _ = std::process::Command::new("open")
-                            .arg("-a")
-                            .arg("Terminal")
-                            .arg(script_path)
-                            .spawn();
-
-                        self.status_message = "Opened device shell in terminal".to_string();
-                    } else {
-                        self.status_message = "Failed to create shell script".to_string();
-                    }
+                    self.status_message = "Opened device shell in terminal".to_string();
                 }
                 ToolkitAction::OpenShell => {
-                    // Open ADB shell in terminal (macOS approach)
+                    // Open ADB shell directly in terminal (macOS approach)
                     let adb_path = adb_bridge.path();
                     let device_id = &device.identifier;
 
-                    // Create a temporary script to run the ADB shell
-                    let temp_dir = std::env::temp_dir();
-                    let script_path = temp_dir.join("adb_shell.sh");
-                    let script_content = format!(
-                        "#!/bin/bash\necho 'Starting ADB shell for device: {}'\n{} -s {} shell\necho 'ADB shell closed'\nread -p 'Press Enter to close...'",
-                        device_id, adb_path, device_id
-                    );
+                    // Open Terminal with ADB shell command directly
+                    let _ = std::process::Command::new("open")
+                        .arg("-a")
+                        .arg("Terminal")
+                        .arg("-e")
+                        .arg(adb_path)
+                        .arg("-s")
+                        .arg(device_id)
+                        .arg("shell")
+                        .spawn();
 
-                    if std::fs::write(&script_path, script_content).is_ok() {
-                        // Make the script executable
-                        let _ = std::process::Command::new("chmod")
-                            .arg("+x")
-                            .arg(&script_path)
-                            .status();
-
-                        // Open Terminal with the script
-                        let _ = std::process::Command::new("open")
-                            .arg("-a")
-                            .arg("Terminal")
-                            .arg(script_path)
-                            .spawn();
-
-                        self.status_message = "Opened ADB shell in terminal".to_string();
-                    } else {
-                        self.status_message = "Failed to create shell script".to_string();
-                    }
+                    self.status_message = "Opened ADB shell in terminal".to_string();
                 }
                 ToolkitAction::None => {}
             }
