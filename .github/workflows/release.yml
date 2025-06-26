@@ -1,0 +1,100 @@
+# DroidView Build and Release Workflow
+# Author: Genxster1998
+# Project: https://github.com/Genxster1998/DroidView
+# Description: Build and publish cross-platform releases for DroidView (v0.1.0)
+
+name: Build and Release DroidView
+
+permissions:
+  contents: write
+
+description: |
+  Build and publish cross-platform (Linux, macOS, Windows) releases for DroidView, a modern, user-friendly graphical frontend for scrcpy and ADB. See https://github.com/Genxster1998/DroidView
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g., v0.1.0)'
+        required: true
+      release_name:
+        description: 'Release name (optional)'
+        required: false
+      release_body:
+        description: 'Release description (optional)'
+        required: false
+
+jobs:
+  build:
+    name: Build binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: droid_view-linux-x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: droid_view-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: droid_view-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: droid_view-windows-x86_64.exe
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - name: Install target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare artifact
+        run: |
+          mkdir dist
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp target/${{ matrix.target }}/release/droid_view.exe dist/${{ matrix.artifact }}
+          else
+            cp target/${{ matrix.target }}/release/droid_view dist/${{ matrix.artifact }}
+          fi
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: ${{ github.event.inputs.release_name || format('DroidView {0}', github.event.inputs.tag_name) }}
+          body: ${{ github.event.inputs.release_body || 'DroidView is a modern, user-friendly graphical frontend for scrcpy and ADB, enabling you to mirror, control, and manage your Android devices from your desktop.\n\nSee https://github.com/Genxster1998/DroidView for more info.' }}
+          draft: false
+          prerelease: false
+          files: |
+            dist/**/droid_view-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
