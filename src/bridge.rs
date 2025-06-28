@@ -81,12 +81,60 @@ impl AdbBridge {
     }
 
     pub fn connect(&self, ip: &str, port: u16) -> Result<()> {
-        let status = Command::new(&self.path)
+        let output = Command::new(&self.path)
             .args(["connect", &format!("{}:{}", ip, port)])
-            .status()?;
+            .output()?;
 
-        if !status.success() {
-            return Err(anyhow::anyhow!("Connect command failed"));
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_lowercase();
+            let stdout = String::from_utf8_lossy(&output.stdout).to_lowercase();
+            
+            // Check for specific error patterns
+            if stderr.contains("connection refused") || stdout.contains("connection refused") {
+                return Err(anyhow::anyhow!(
+                    "Connection refused: Unable to connect to {}:{}. Please check if:\n\
+                    • The device is powered on and connected to the same network\n\
+                    • The IP address {} is correct\n\
+                    • Port {} is not blocked by firewall\n\
+                    • ADB TCP/IP is enabled on the device (run 'adb tcpip 5555' on USB first)",
+                    ip, port, ip, port
+                ));
+            } else if stderr.contains("no route to host") || stdout.contains("no route to host") {
+                return Err(anyhow::anyhow!(
+                    "No route to host: Cannot reach {}:{}. Please check if:\n\
+                    • The IP address {} is correct\n\
+                    • The device is on the same network\n\
+                    • Your network allows the connection",
+                    ip, port, ip
+                ));
+            } else if stderr.contains("timeout") || stdout.contains("timeout") {
+                return Err(anyhow::anyhow!(
+                    "Connection timeout: Unable to reach {}:{}. Please check if:\n\
+                    • The device is powered on\n\
+                    • The IP address {} is correct\n\
+                    • The device is on the same network",
+                    ip, port, ip
+                ));
+            } else if stderr.contains("already connected") || stdout.contains("already connected") {
+                return Err(anyhow::anyhow!(
+                    "Already connected to {}:{}",
+                    ip, port
+                ));
+            } else {
+                // Generic error with captured output for debugging
+                let error_msg = if !stderr.is_empty() {
+                    stderr
+                } else if !stdout.is_empty() {
+                    stdout
+                } else {
+                    "Unknown connection error".to_string()
+                };
+                
+                return Err(anyhow::anyhow!(
+                    "Failed to connect to {}:{} - {}",
+                    ip, port, error_msg.trim()
+                ));
+            }
         }
 
         Ok(())

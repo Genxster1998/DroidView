@@ -4,7 +4,6 @@ use droid_view::config::AppConfig;
 use droid_view::logging::init_logging;
 use eframe::{egui, NativeOptions};
 use egui::IconData;
-use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use droid_view::app::ICON_PNG;
