@@ -28,7 +28,14 @@ DroidView is a modern, user-friendly graphical frontend for [scrcpy](https://git
 - Configure settings via the settings window (theme, bitrate, panels, etc.).
 
 ## Configuration
-- Config is saved at: `~/.config/DroidView/config.toml` (Linux/macOS) or the platform's config directory.
+-  Platform	Config Path
+
+| Platform | Config Path |
+|----------|-------------|
+| Windows  | `C:\Users\<User>\AppData\Roaming\DroidView\config.toml` |
+| macOS    | `~/Library/Application Support/DroidView/config.toml`   |
+| Linux    | `~/.config/DroidView/config.toml`                       |
+
 
 ## License
 DroidView is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE) for details. 
