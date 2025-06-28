@@ -1,7 +1,7 @@
 [package]
 name = "droid_view"
-version = "0.1.0"
-edition = "2021"
+version = "0.1.1"
+edition = "2024"
 authors = ["Genxster1998 <ck.2229.ck@gmail.com>"]
 description = "A simple, pluggable, graphical user interface for scrcpy"
 license = "GPL-3.0"

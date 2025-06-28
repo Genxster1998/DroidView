@@ -632,7 +632,86 @@ impl DroidViewApp {
                             
                             // Spawn background task
                             self.run_background_task("imei".to_string(), move || {
-                                let output = std::process::Command::new(&adb_path)
+                                // Try multiple IMEI retrieval methods for different Android versions and dual-SIM devices
+                                let mut imei_result = String::new();
+                                
+                                // Method 1: For Android 10+ (requires READ_PHONE_STATE permission)
+                                let output1 = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "settings get secure android_id"
+                                    ])
+                                    .output();
+                                
+                                if let Ok(output) = output1 {
+                                    if output.status.success() {
+                                        let android_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                                        if !android_id.is_empty() {
+                                            imei_result.push_str(&format!("Android ID: {}\n", android_id));
+                                        }
+                                    }
+                                }
+                                
+                                // Method 2: For dual-SIM devices (Android 5+)
+                                let output2 = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "getprop ro.telephony.imei"
+                                    ])
+                                    .output();
+                                
+                                if let Ok(output) = output2 {
+                                    if output.status.success() {
+                                        let imei = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                                        if !imei.is_empty() && imei != "0" {
+                                            imei_result.push_str(&format!("IMEI: {}\n", imei));
+                                        }
+                                    }
+                                }
+                                
+                                // Method 3: For dual-SIM devices - IMEI1 and IMEI2
+                                let output3 = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "getprop ro.telephony.imei1"
+                                    ])
+                                    .output();
+                                
+                                if let Ok(output) = output3 {
+                                    if output.status.success() {
+                                        let imei1 = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                                        if !imei1.is_empty() && imei1 != "0" {
+                                            imei_result.push_str(&format!("IMEI1: {}\n", imei1));
+                                        }
+                                    }
+                                }
+                                
+                                let output4 = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "getprop ro.telephony.imei2"
+                                    ])
+                                    .output();
+                                
+                                if let Ok(output) = output4 {
+                                    if output.status.success() {
+                                        let imei2 = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                                        if !imei2.is_empty() && imei2 != "0" {
+                                            imei_result.push_str(&format!("IMEI2: {}\n", imei2));
+                                        }
+                                    }
+                                }
+                                
+                                // Method 4: Legacy method for older devices (deprecated but might work on some)
+                                let output5 = std::process::Command::new(&adb_path)
                                     .args([
                                         "-s",
                                         &device_id,
@@ -640,17 +719,39 @@ impl DroidViewApp {
                                         "service call iphonesubinfo 4 | cut -c 52-66 | tr -d '.[:space:]'"
                                     ])
                                     .output();
-
-                                match output {
-                                    Ok(output) if output.status.success() => {
+                                
+                                if let Ok(output) = output5 {
+                                    if output.status.success() {
                                         let imei = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                                        if !imei.is_empty() {
-                                            ImeiResult(imei)
-                                        } else {
-                                            ImeiResult("IMEI not available".to_string())
+                                        if !imei.is_empty() && imei.len() >= 14 {
+                                            imei_result.push_str(&format!("Legacy IMEI: {}\n", imei));
                                         }
                                     }
-                                    _ => ImeiResult("Failed to retrieve IMEI".to_string()),
+                                }
+                                
+                                // Method 5: Get device serial number as fallback
+                                let output6 = std::process::Command::new(&adb_path)
+                                    .args([
+                                        "-s",
+                                        &device_id,
+                                        "shell",
+                                        "getprop ro.serialno"
+                                    ])
+                                    .output();
+                                
+                                if let Ok(output) = output6 {
+                                    if output.status.success() {
+                                        let serial = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                                        if !serial.is_empty() {
+                                            imei_result.push_str(&format!("Serial: {}\n", serial));
+                                        }
+                                    }
+                                }
+                                
+                                if !imei_result.is_empty() {
+                                    ImeiResult(imei_result.trim().to_string())
+                                } else {
+                                    ImeiResult("No IMEI/Device ID information available. This may be due to:\n• Android security restrictions (Android 10+)\n• Missing READ_PHONE_STATE permission\n• Device not supporting IMEI retrieval".to_string())
                                 }
                             });
                             
@@ -1266,7 +1367,7 @@ impl eframe::App for DroidViewApp {
                                 // App name and version
                                 ui.label(egui::RichText::new("DroidView").size(20.0).strong());
                                 ui.label(egui::RichText::new("(droid_view)").size(10.0).color(Color32::GRAY));
-                                ui.label(egui::RichText::new("Version 0.1.0").size(12.0));
+                                ui.label(egui::RichText::new("Version 0.1.1").size(12.0));
                                 
                                 ui.add_space(8.0);
                                 
