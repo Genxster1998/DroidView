@@ -566,20 +566,59 @@ impl DroidViewApp {
                     }
                 }
                 ToolkitAction::OpenShell => {
-                    // Open ADB shell directly in terminal (macOS approach)
+                    // Open ADB shell directly in terminal (cross-platform)
                     let adb_path = adb_bridge.path();
                     let device_id = &device.identifier;
 
-                    // Use osascript to open Terminal with ADB shell command
-                    let script = format!(
-                        "tell application \"Terminal\" to do script \"{} -s {} shell\"",
-                        adb_path, device_id
-                    );
-                    
-                    let _ = std::process::Command::new("osascript")
-                        .arg("-e")
-                        .arg(script)
-                        .spawn();
+                    #[cfg(target_os = "macos")]
+                    {
+                        // Use osascript to open Terminal with ADB shell command
+                        let script = format!(
+                            "tell application \"Terminal\" to do script \"{} -s {} shell\"",
+                            adb_path, device_id
+                        );
+                        
+                        let _ = std::process::Command::new("osascript")
+                            .arg("-e")
+                            .arg(script)
+                            .spawn();
+                    }
+
+                    #[cfg(target_os = "windows")]
+                    {
+                        // Use cmd to open Command Prompt with ADB shell command
+                        let _ = std::process::Command::new("cmd")
+                            .args(["/C", "start", "cmd", "/K", &format!("{} -s {} shell", adb_path, device_id)])
+                            .spawn();
+                    }
+
+                    #[cfg(target_os = "linux")]
+                    {
+                        // Try different terminal emulators on Linux
+                        let terminals = [
+                            ("gnome-terminal", &["--", "bash", "-c", &format!("{} -s {} shell; exec bash", adb_path, device_id)]),
+                            ("konsole", &["-e", "bash", "-c", &format!("{} -s {} shell; exec bash", adb_path, device_id)]),
+                            ("xterm", &["-e", "bash", "-c", &format!("{} -s {} shell; exec bash", adb_path, device_id)]),
+                            ("terminator", &["-e", &format!("{} -s {} shell", adb_path, device_id)]),
+                            ("xfce4-terminal", &["-e", &format!("{} -s {} shell", adb_path, device_id)]),
+                        ];
+
+                        let mut opened = false;
+                        for (terminal, args) in &terminals {
+                            if std::process::Command::new(terminal).args(*args).spawn().is_ok() {
+                                opened = true;
+                                break;
+                            }
+                        }
+
+                        if !opened {
+                            // Fallback: try to open default terminal
+                            let _ = std::process::Command::new("x-terminal-emulator")
+                                .arg("-e")
+                                .arg(format!("{} -s {} shell", adb_path, device_id))
+                                .spawn();
+                        }
+                    }
 
                     self.status_message = "Opened ADB shell in terminal".to_string();
                 }
