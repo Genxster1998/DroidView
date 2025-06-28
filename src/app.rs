@@ -595,7 +595,7 @@ impl DroidViewApp {
                     #[cfg(target_os = "linux")]
                     {
                         // Try different terminal emulators on Linux
-                        let terminals = [
+                        let terminals: &[(&str, &[&str])] = &[
                             ("gnome-terminal", &["--", "bash", "-c", &format!("{} -s {} shell; exec bash", adb_path, device_id)]),
                             ("konsole", &["-e", "bash", "-c", &format!("{} -s {} shell; exec bash", adb_path, device_id)]),
                             ("xterm", &["-e", "bash", "-c", &format!("{} -s {} shell; exec bash", adb_path, device_id)]),
@@ -604,7 +604,7 @@ impl DroidViewApp {
                         ];
 
                         let mut opened = false;
-                        for (terminal, args) in &terminals {
+                        for (terminal, args) in terminals {
                             if std::process::Command::new(terminal).args(*args).spawn().is_ok() {
                                 opened = true;
                                 break;
