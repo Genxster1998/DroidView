@@ -168,7 +168,7 @@ impl DroidViewApp {
         // Auto-detect adb if not configured
         if config.adb_path.is_none() {
             if let Some(adb_path) = crate::utils::find_adb() {
-                config.adb_path = Some(adb_path.to_string_lossy().to_string());
+                config.adb_path = Some(adb_path.display().to_string());
                 info!(
                     "Auto-detected ADB at: {}",
                     config.adb_path.as_ref().unwrap()
@@ -179,7 +179,7 @@ impl DroidViewApp {
         // Auto-detect scrcpy if not configured
         if config.scrcpy_path.is_none() {
             if let Some(scrcpy_path) = crate::utils::find_scrcpy() {
-                config.scrcpy_path = Some(scrcpy_path.to_string_lossy().to_string());
+                config.scrcpy_path = Some(scrcpy_path.display().to_string());
                 info!(
                     "Auto-detected scrcpy at: {}",
                     config.scrcpy_path.as_ref().unwrap()

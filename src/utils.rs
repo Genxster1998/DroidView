@@ -4,25 +4,58 @@ use std::process::Command;
 use tracing;
 
 pub fn find_executable(name: &str) -> Option<PathBuf> {
-    if let Ok(output) = Command::new("which").arg(name).output() {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            return Some(PathBuf::from(path));
+    #[cfg(target_os = "windows")]
+    {
+        // On Windows, use 'where' command to find executable in PATH
+        if let Ok(output) = Command::new("where").arg(name).output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).lines().next().unwrap_or("").trim().to_string();
+                if !path.is_empty() {
+                    return Some(PathBuf::from(path));
+                }
+            }
+        }
+
+        // Try common Windows paths
+        let common_paths = [
+            "C:\\Program Files\\Android\\android-sdk\\platform-tools",
+            "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools",
+            "C:\\Users\\%USERNAME%\\AppData\\Local\\Android\\Sdk\\platform-tools",
+            "C:\\Android\\platform-tools",
+        ];
+
+        for path in &common_paths {
+            let expanded_path = path.replace("%USERNAME%", &std::env::var("USERNAME").unwrap_or_default());
+            let full_path = PathBuf::from(&expanded_path).join(format!("{}.exe", name));
+            if full_path.exists() {
+                return Some(full_path);
+            }
         }
     }
 
-    // Try common paths
-    let common_paths = [
-        "/usr/bin",
-        "/usr/local/bin",
-        "/opt/homebrew/bin",
-        "/usr/local/opt/android-platform-tools/bin",
-    ];
+    #[cfg(not(target_os = "windows"))]
+    {
+        // On Unix-like systems, use 'which' command
+        if let Ok(output) = Command::new("which").arg(name).output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                return Some(PathBuf::from(path));
+            }
+        }
 
-    for path in &common_paths {
-        let full_path = PathBuf::from(path).join(name);
-        if full_path.exists() {
-            return Some(full_path);
+        // Try common Unix paths
+        let common_paths = [
+            "/usr/bin",
+            "/usr/local/bin",
+            "/opt/homebrew/bin",
+            "/usr/local/opt/android-platform-tools/bin",
+        ];
+
+        for path in &common_paths {
+            let full_path = PathBuf::from(path).join(name);
+            if full_path.exists() {
+                return Some(full_path);
+            }
         }
     }
 
