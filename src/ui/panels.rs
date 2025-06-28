@@ -18,6 +18,10 @@ pub enum ToolkitAction {
     BatteryInfo,
     UninstallApp,
     DisableApp,
+    Reboot,
+    Shutdown,
+    RebootRecovery,
+    RebootBootloader,
 }
 
 pub enum SwipeAction {
@@ -33,6 +37,10 @@ pub struct SwipePanel {
 
 pub struct ToolkitPanel {
     pub visible: bool,
+    pub show_reboot_confirm: bool,
+    pub show_shutdown_confirm: bool,
+    pub show_recovery_confirm: bool,
+    pub show_bootloader_confirm: bool,
 }
 
 pub struct BottomPanel {
@@ -101,7 +109,13 @@ impl Default for ToolkitPanel {
 
 impl ToolkitPanel {
     pub fn new() -> Self {
-        Self { visible: true }
+        Self {
+            visible: true,
+            show_reboot_confirm: false,
+            show_shutdown_confirm: false,
+            show_recovery_confirm: false,
+            show_bootloader_confirm: false,
+        }
     }
 
     pub fn show(&mut self, ui: &mut Ui, loading: &ToolkitLoadingState) -> ToolkitAction {
@@ -230,6 +244,150 @@ impl ToolkitPanel {
                         ui.add(egui::Spinner::new().size(16.0));
                     }
                 });
+
+                // Device Control Section
+                ui.separator();
+                ui.label(egui::RichText::new("Device Control").size(11.0).color(egui::Color32::GRAY));
+                
+                // Reboot/Shutdown buttons in a horizontal row
+                ui.horizontal(|ui| {
+                    // Reboot button
+                    let reboot_resp = ui.add(
+                        egui::Button::new(egui::RichText::new("🔄").size(16.0))
+                            .min_size(egui::vec2(32.0, 32.0))
+                    );
+                    if reboot_resp.clicked() {
+                        self.show_reboot_confirm = true;
+                     }
+                    reboot_resp.on_hover_text("Reboot Device");
+
+                    // Shutdown button
+                    let shutdown_resp = ui.add(
+                        egui::Button::new(egui::RichText::new("⏹️").size(16.0))
+                            .min_size(egui::vec2(32.0, 32.0))
+                    );
+                    if shutdown_resp.clicked() {
+                        self.show_shutdown_confirm = true;
+                     }
+                    shutdown_resp.on_hover_text("Shutdown Device");
+
+                    // Reboot to Recovery button
+                    let recovery_resp = ui.add(
+                        egui::Button::new(egui::RichText::new("🔄").size(16.0))
+                            .min_size(egui::vec2(32.0, 32.0))
+                    );
+                    if recovery_resp.clicked() {
+                        self.show_recovery_confirm = true;
+                     }
+                    recovery_resp.on_hover_text("Reboot to Recovery");
+
+                    // Reboot to Bootloader button
+                    let bootloader_resp = ui.add(
+                        egui::Button::new(egui::RichText::new("🔧").size(16.0))
+                            .min_size(egui::vec2(32.0, 32.0))
+                    );
+                    if bootloader_resp.clicked() {
+                        self.show_bootloader_confirm = true;
+                     }
+                    bootloader_resp.on_hover_text("Reboot to Bootloader");
+                });
+
+                // Confirmation dialogs
+                if self.show_reboot_confirm {
+                    egui::Window::new("Confirm Reboot")
+                        .collapsible(false)
+                        .resizable(false)
+                        .fixed_size(egui::vec2(300.0, 150.0))
+                        .show(ui.ctx(), |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(egui::RichText::new("⚠️ Confirm Device Reboot").size(16.0).strong());
+                                ui.add_space(8.0);
+                                ui.label("Are you sure you want to reboot the device?");
+                                ui.add_space(16.0);
+                                ui.horizontal(|ui| {
+                                    if ui.button("OK").clicked() {
+                                        action = ToolkitAction::Reboot;
+                                        self.show_reboot_confirm = false;
+                                    }
+                                    if ui.button("Cancel").clicked() {
+                                        self.show_reboot_confirm = false;
+                                    }
+                                });
+                            });
+                        });
+                }
+
+                if self.show_shutdown_confirm {
+                    egui::Window::new("Confirm Shutdown")
+                        .collapsible(false)
+                        .resizable(false)
+                        .fixed_size(egui::vec2(300.0, 150.0))
+                        .show(ui.ctx(), |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(egui::RichText::new("⚠️ Confirm Device Shutdown").size(16.0).strong());
+                                ui.add_space(8.0);
+                                ui.label("Are you sure you want to shutdown the device?");
+                                ui.add_space(16.0);
+                                ui.horizontal(|ui| {
+                                    if ui.button("OK").clicked() {
+                                        action = ToolkitAction::Shutdown;
+                                        self.show_shutdown_confirm = false;
+                                    }
+                                    if ui.button("Cancel").clicked() {
+                                        self.show_shutdown_confirm = false;
+                                    }
+                                });
+                            });
+                        });
+                }
+
+                if self.show_recovery_confirm {
+                    egui::Window::new("Confirm Recovery Reboot")
+                        .collapsible(false)
+                        .resizable(false)
+                        .fixed_size(egui::vec2(300.0, 150.0))
+                        .show(ui.ctx(), |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(egui::RichText::new("⚠️ Confirm Recovery Reboot").size(16.0).strong());
+                                ui.add_space(8.0);
+                                ui.label("Are you sure you want to reboot to recovery mode?");
+                                ui.add_space(16.0);
+                                ui.horizontal(|ui| {
+                                    if ui.button("OK").clicked() {
+                                        action = ToolkitAction::RebootRecovery;
+                                        self.show_recovery_confirm = false;
+                                    }
+                                    if ui.button("Cancel").clicked() {
+                                        self.show_recovery_confirm = false;
+                                    }
+                                });
+                            });
+                        });
+                }
+
+                if self.show_bootloader_confirm {
+                    egui::Window::new("Confirm Bootloader Reboot")
+                        .collapsible(false)
+                        .resizable(false)
+                        .fixed_size(egui::vec2(300.0, 150.0))
+                        .show(ui.ctx(), |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(egui::RichText::new("⚠️ Confirm Bootloader Reboot").size(16.0).strong());
+                                ui.add_space(8.0);
+                                ui.label("Are you sure you want to reboot to bootloader?");
+                                ui.add_space(16.0);
+                                ui.horizontal(|ui| {
+                                    if ui.button("OK").clicked() {
+                                        action = ToolkitAction::RebootBootloader;
+                                        self.show_bootloader_confirm = false;
+                                    }
+                                    if ui.button("Cancel").clicked() {
+                                        self.show_bootloader_confirm = false;
+                                    }
+                                });
+                            });
+                        });
+                }
             });
         });
         action

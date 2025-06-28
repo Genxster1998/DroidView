@@ -953,6 +953,90 @@ impl DroidViewApp {
                         }
                     }
                 }
+                ToolkitAction::Reboot => {
+                    if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                        let status = std::process::Command::new(adb_bridge.path())
+                            .args(["-s", &device.identifier, "reboot"])
+                            .status();
+                        
+                        match status {
+                            Ok(s) if s.success() => {
+                                self.status_message = "Device reboot initiated".to_string();
+                            }
+                            Ok(s) => {
+                                self.status_message = format!("Reboot failed: exit code {}", s);
+                            }
+                            Err(e) => {
+                                self.status_message = format!("Reboot error: {}", e);
+                            }
+                        }
+                    } else {
+                        self.status_message = "No device selected or ADB not configured".to_string();
+                    }
+                }
+                ToolkitAction::Shutdown => {
+                    if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                        let status = std::process::Command::new(adb_bridge.path())
+                            .args(["-s", &device.identifier, "shell", "reboot", "-p"])
+                            .status();
+                        
+                        match status {
+                            Ok(s) if s.success() => {
+                                self.status_message = "Device shutdown initiated".to_string();
+                            }
+                            Ok(s) => {
+                                self.status_message = format!("Shutdown failed: exit code {}", s);
+                            }
+                            Err(e) => {
+                                self.status_message = format!("Shutdown error: {}", e);
+                            }
+                        }
+                    } else {
+                        self.status_message = "No device selected or ADB not configured".to_string();
+                    }
+                }
+                ToolkitAction::RebootRecovery => {
+                    if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                        let status = std::process::Command::new(adb_bridge.path())
+                            .args(["-s", &device.identifier, "reboot", "recovery"])
+                            .status();
+                        
+                        match status {
+                            Ok(s) if s.success() => {
+                                self.status_message = "Device rebooting to recovery mode".to_string();
+                            }
+                            Ok(s) => {
+                                self.status_message = format!("Recovery reboot failed: exit code {}", s);
+                            }
+                            Err(e) => {
+                                self.status_message = format!("Recovery reboot error: {}", e);
+                            }
+                        }
+                    } else {
+                        self.status_message = "No device selected or ADB not configured".to_string();
+                    }
+                }
+                ToolkitAction::RebootBootloader => {
+                    if let (Some(adb_bridge), Some(device)) = (self.adb_bridge.as_ref(), self.device_list.selected_device()) {
+                        let status = std::process::Command::new(adb_bridge.path())
+                            .args(["-s", &device.identifier, "reboot", "bootloader"])
+                            .status();
+                        
+                        match status {
+                            Ok(s) if s.success() => {
+                                self.status_message = "Device rebooting to bootloader".to_string();
+                            }
+                            Ok(s) => {
+                                self.status_message = format!("Bootloader reboot failed: exit code {}", s);
+                            }
+                            Err(e) => {
+                                self.status_message = format!("Bootloader reboot error: {}", e);
+                            }
+                        }
+                    } else {
+                        self.status_message = "No device selected or ADB not configured".to_string();
+                    }
+                }
                 ToolkitAction::None => {}
             }
         } else if let ToolkitAction::None = action {
