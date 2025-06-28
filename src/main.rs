@@ -7,6 +7,7 @@ use egui::IconData;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use droid_view::app::ICON_PNG;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -60,8 +61,7 @@ async fn main() -> Result<(), eframe::Error> {
     }
 
     // --- ICON LOADING ---
-    let icon_path = Path::new("assets/icon.png");
-    let icon = if let Ok(img) = image::open(icon_path) {
+    let icon = if let Ok(img) = image::load_from_memory(ICON_PNG) {
         let img = img.to_rgba8();
         let (width, height) = img.dimensions();
         let rgba = img.into_raw();
@@ -71,10 +71,7 @@ async fn main() -> Result<(), eframe::Error> {
             height,
         }))
     } else {
-        eprintln!(
-            "Warning: Could not load app icon at {}",
-            icon_path.display()
-        );
+        eprintln!("Warning: Could not load embedded app icon");
         None
     };
     if let Some(icon) = icon {

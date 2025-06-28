@@ -67,6 +67,9 @@ impl From<String> for BackgroundTaskResult {
     }
 }
 
+// Embed the icon at compile time
+pub const ICON_PNG: &[u8] = include_bytes!("../assets/icon.png");
+
 pub struct DroidViewApp {
     config: Arc<Mutex<AppConfig>>,
     devices: Vec<Device>,
@@ -1202,8 +1205,7 @@ impl eframe::App for DroidViewApp {
                                 ui.add_space(8.0);
                                 
                                 // App icon
-                                let icon_path = std::path::Path::new("assets/icon.png");
-                                if let Ok(img) = image::open(icon_path) {
+                                if let Ok(img) = image::load_from_memory(ICON_PNG) {
                                     let img = img.to_rgba8();
                                     let (w, h) = img.dimensions();
                                     let color_image = egui::ColorImage::from_rgba_unmultiplied(
