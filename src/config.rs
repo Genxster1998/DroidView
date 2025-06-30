@@ -15,6 +15,7 @@ pub struct AppConfig {
     pub fullscreen: bool,
     pub dimension: Option<u32>,
     pub extra_args: String,
+    pub force_adb_forward: bool,
     pub panels: PanelConfig,
     pub theme: String,
     pub wireless_adb: WirelessAdbConfig,
@@ -47,6 +48,7 @@ impl Default for AppConfig {
             fullscreen: false,
             dimension: None,
             extra_args: String::new(),
+            force_adb_forward: false,
             panels: PanelConfig {
                 swipe: true,
                 toolkit: true,

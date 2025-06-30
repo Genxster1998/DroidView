@@ -89,6 +89,6 @@ async fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "DroidView",
         native_options,
-        Box::new(move |cc| Box::new(DroidViewApp::new(cc, config, debug_disable_scrcpy))),
+        Box::new(move |cc| Ok(Box::new(DroidViewApp::new(cc, config, debug_disable_scrcpy)))),
     )
 }

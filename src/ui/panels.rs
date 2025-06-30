@@ -259,7 +259,7 @@ impl ToolkitPanel {
                     if reboot_resp.clicked() {
                         self.show_reboot_confirm = true;
                      }
-                    reboot_resp.on_hover_text("Reboot Device");
+                    reboot_resp.on_hover_text("Reboot Device\nRestart the device normally");
 
                     // Shutdown button
                     let shutdown_resp = ui.add(
@@ -269,17 +269,17 @@ impl ToolkitPanel {
                     if shutdown_resp.clicked() {
                         self.show_shutdown_confirm = true;
                      }
-                    shutdown_resp.on_hover_text("Shutdown Device");
+                    shutdown_resp.on_hover_text("Shutdown Device\nPower off the device completely");
 
                     // Reboot to Recovery button
                     let recovery_resp = ui.add(
-                        egui::Button::new(egui::RichText::new("🔄").size(16.0))
+                        egui::Button::new(egui::RichText::new("🛠️").size(16.0))
                             .min_size(egui::vec2(32.0, 32.0))
                     );
                     if recovery_resp.clicked() {
                         self.show_recovery_confirm = true;
                      }
-                    recovery_resp.on_hover_text("Reboot to Recovery");
+                    recovery_resp.on_hover_text("Reboot to Recovery\nRestart device in recovery mode for system maintenance");
 
                     // Reboot to Bootloader button
                     let bootloader_resp = ui.add(
@@ -289,7 +289,7 @@ impl ToolkitPanel {
                     if bootloader_resp.clicked() {
                         self.show_bootloader_confirm = true;
                      }
-                    bootloader_resp.on_hover_text("Reboot to Bootloader");
+                    bootloader_resp.on_hover_text("Reboot to Bootloader\nRestart device in bootloader mode for flashing");
                 });
 
                 // Confirmation dialogs
@@ -541,7 +541,7 @@ impl WirelessAdbPanel {
                     ui.label("No devices connected");
                 } else {
                     // Device selection dropdown
-                    egui::ComboBox::from_id_source("device_select")
+                    egui::ComboBox::from_id_salt("device_select")
                         .selected_text(
                             self.selected_device
                                 .as_ref()

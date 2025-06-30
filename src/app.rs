@@ -14,6 +14,7 @@ use tracing::{error, info};
 use crate::utils::is_process_running;
 use crate::ui::BottomPanelAction;
 use std::collections::HashMap;
+use egui_knob::{Knob, KnobStyle, LabelPosition};
 
 // Background task results
 #[derive(Debug)]
@@ -316,10 +317,20 @@ impl DroidViewApp {
                 } else {
                     "Kbps"
                 };
-                ui.horizontal(|ui| {
-                    ui.label("Bitrate:");
-                    ui.add(egui::DragValue::new(&mut bitrate_value).clamp_range(100..=20000).speed(100).suffix(" "));
-                    egui::ComboBox::from_id_source("scrcpy_bitrate_unit_combo")
+                ui.vertical(|ui| {
+                    let mut knob_value = bitrate_value as f32;
+                    let knob = Knob::new(&mut knob_value, 100.0, 20000.0, KnobStyle::Dot)
+                        .with_size(60.0)
+                        .with_font_size(14.0)
+                        .with_stroke_width(3.0)
+                        .with_colors(Color32::GRAY, Color32::WHITE, Color32::WHITE)
+                        .with_label("Bitrate", LabelPosition::Top);
+                    let knob_resp = ui.add(knob);
+                    if knob_resp.changed() {
+                        knob_value = (knob_value / 100.0).round() * 100.0;
+                        bitrate_value = knob_value as u32;
+                    }
+                    egui::ComboBox::new("scrcpy_bitrate_unit_combo", "Unit")
                         .selected_text(bitrate_unit)
                         .show_ui(ui, |ui| {
                             ui.selectable_value(&mut bitrate_unit, "Kbps", "Kbps");
@@ -346,7 +357,7 @@ impl DroidViewApp {
                 ui.horizontal(|ui| {
                     let mut dim_val = config.dimension.unwrap_or(0);
                     ui.label("Max dimensions:");
-                    if ui.add(egui::DragValue::new(&mut dim_val).clamp_range(0..=8192).speed(10)).changed() {
+                    if ui.add(egui::DragValue::new(&mut dim_val).range(0..=8192).speed(10)).changed() {
                         if dim_val == 0 {
                             config.dimension = None;
                         } else {
@@ -453,6 +464,7 @@ impl DroidViewApp {
                 config.dimension,
                 &config.extra_args,
                 config.turn_screen_off,
+                config.force_adb_forward,
             );
 
             info!("Built scrcpy arguments: {:?}", args);
@@ -1297,7 +1309,7 @@ impl eframe::App for DroidViewApp {
                 .collapsible(false)
                 .resizable(false)
                 .fixed_size(egui::vec2(260.0, 120.0))
-                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.add_space(4.0);
@@ -1318,7 +1330,7 @@ impl eframe::App for DroidViewApp {
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(400.0, 300.0))
-                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.add_space(4.0);
@@ -1341,7 +1353,7 @@ impl eframe::App for DroidViewApp {
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(350.0, 250.0))
-                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.add_space(4.0);
@@ -1363,7 +1375,7 @@ impl eframe::App for DroidViewApp {
                 .collapsible(false)
                 .resizable(false)
                 .fixed_size(egui::vec2(300.0, 200.0))
-                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.add_space(4.0);
@@ -1372,12 +1384,12 @@ impl eframe::App for DroidViewApp {
                     
                     ui.horizontal(|ui| {
                         ui.label("Duration (seconds):");
-                        ui.add(egui::DragValue::new(&mut self.screenrecord_duration).clamp_range(1..=180).speed(1));
+                        ui.add(egui::DragValue::new(&mut self.screenrecord_duration).range(1..=180).speed(1));
                     });
                     
                     ui.horizontal(|ui| {
                         ui.label("Bitrate (KB/s):");
-                        ui.add(egui::DragValue::new(&mut self.screenrecord_bitrate).clamp_range(100..=10000).speed(100));
+                        ui.add(egui::DragValue::new(&mut self.screenrecord_bitrate).range(100..=10000).speed(100));
                     });
                     
                     ui.separator();
@@ -1447,7 +1459,7 @@ impl eframe::App for DroidViewApp {
 
         // Show About Dialog if available
         if self.about_dialog {
-            egui::Area::new("about_dialog")
+            egui::Area::new("about_dialog".into())
                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style())
@@ -1481,7 +1493,7 @@ impl eframe::App for DroidViewApp {
                                 // App name and version
                                 ui.label(egui::RichText::new("DroidView").size(20.0).strong());
                                 ui.label(egui::RichText::new("(droid_view)").size(10.0).color(Color32::GRAY));
-                                ui.label(egui::RichText::new("Version 0.1.1").size(12.0));
+                                ui.label(egui::RichText::new("Version 0.1.2").size(12.0));
                                 
                                 ui.add_space(8.0);
                                 
@@ -1498,7 +1510,7 @@ impl eframe::App for DroidViewApp {
                                 // Website
                                 ui.vertical_centered(|ui| {
                                     ui.label(egui::RichText::new("Website:").size(10.0));
-                                    if ui.link(egui::RichText::new("github.com/Genxster1998/DroidView").size(10.0).color(Color32::BLUE)).clicked() {
+                                    if ui.link(egui::RichText::new("🐙/Genxster1998/DroidView").size(12.0).color(Color32::CYAN)).clicked() {
                                         // Open URL in default browser
                                         let _ = std::process::Command::new("open")
                                             .arg("https://github.com/Genxster1998/DroidView")
@@ -1523,7 +1535,7 @@ impl eframe::App for DroidViewApp {
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(400.0, 500.0))
-                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.add_space(4.0);
@@ -1646,7 +1658,7 @@ impl eframe::App for DroidViewApp {
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(400.0, 500.0))
-                .frame(egui::Frame::window(&egui::Style::default()).rounding(egui::Rounding::same(0.0)))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
                     ui.add_space(4.0);
