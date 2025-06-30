@@ -541,7 +541,7 @@ impl WirelessAdbPanel {
                     ui.label("No devices connected");
                 } else {
                     // Device selection dropdown
-                    egui::ComboBox::from_id_source("device_select")
+                    egui::ComboBox::from_id_salt("device_select")
                         .selected_text(
                             self.selected_device
                                 .as_ref()

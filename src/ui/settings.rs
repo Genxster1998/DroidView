@@ -125,7 +125,7 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
             ui.horizontal(|ui| {
                 ui.label("Bitrate:");
                 ui.add(egui::Slider::new(&mut bitrate_value, 100..=20000).text("Value"));
-                egui::ComboBox::from_id_source("bitrate_unit_combo")
+                egui::ComboBox::from_id_salt("bitrate_unit_combo")
                     .selected_text(bitrate_unit)
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut bitrate_unit, "Kbps", "Kbps");
@@ -152,7 +152,7 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
                 (Some("flip180"), "Flip 180°"),
                 (Some("flip270"), "Flip 270°"),
             ];
-            egui::ComboBox::from_id_source("orientation_combo")
+            egui::ComboBox::from_id_salt("orientation_combo")
                 .selected_text(
                     orientations
                         .iter()
@@ -191,10 +191,12 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
                     ui.add(
                         egui::DragValue::new(dim)
                             .suffix("px")
-                            .clamp_range(100..=10000),
+                            .range(100..=10000),
                     );
                 }
             });
+
+            ui.checkbox(&mut config.force_adb_forward, "Force ADB Forward (--force-adb-forward)");
         });
 
         // Panels

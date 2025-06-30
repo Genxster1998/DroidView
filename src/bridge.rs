@@ -264,6 +264,7 @@ impl ScrcpyBridge {
         dimension: Option<u32>,
         extra_args: &str,
         turn_screen_off: bool,
+        force_adb_forward: bool,
     ) -> Vec<String> {
         let mut args = Vec::new();
 
@@ -293,6 +294,10 @@ impl ScrcpyBridge {
 
         if turn_screen_off {
             args.push("-S".to_string());
+        }
+
+        if force_adb_forward {
+            args.push("--force-adb-forward".to_string());
         }
 
         // Parse extra arguments
