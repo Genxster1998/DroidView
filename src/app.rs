@@ -292,11 +292,78 @@ impl DroidViewApp {
                 if ui.button("▶ Start Scrcpy").clicked() {
                     start_scrcpy = true;
                 }
-
                 if ui.button("■ Stop Scrcpy").clicked() {
                     stop_scrcpy = true;
                 }
             });
+
+            // --- Bitrate knob and quick settings ---
+            {
+                let mut config = self.config.try_lock().unwrap();
+                // Bitrate adjustment knob
+                let mut bitrate_value: u32 = {
+                    let s = config.bitrate.trim().to_uppercase();
+                    if s.ends_with('M') {
+                        s.trim_end_matches('M').parse::<u32>().unwrap_or(8) * 1000
+                    } else if s.ends_with('K') {
+                        s.trim_end_matches('K').parse::<u32>().unwrap_or(8000)
+                    } else {
+                        s.parse::<u32>().unwrap_or(8000)
+                    }
+                };
+                let mut bitrate_unit = if config.bitrate.trim().to_uppercase().ends_with('M') {
+                    "Mbps"
+                } else {
+                    "Kbps"
+                };
+                ui.horizontal(|ui| {
+                    ui.label("Bitrate:");
+                    ui.add(egui::DragValue::new(&mut bitrate_value).clamp_range(100..=20000).speed(100).suffix(" "));
+                    egui::ComboBox::from_id_source("scrcpy_bitrate_unit_combo")
+                        .selected_text(bitrate_unit)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut bitrate_unit, "Kbps", "Kbps");
+                            ui.selectable_value(&mut bitrate_unit, "Mbps", "Mbps");
+                        });
+                    let bitrate_str = if bitrate_unit == "Mbps" {
+                        format!("{}M", (bitrate_value as f32 / 1000.0).round() as u32)
+                    } else {
+                        format!("{}K", bitrate_value)
+                    };
+                    config.bitrate = bitrate_str;
+                    ui.label(format!("Current: {}", config.bitrate));
+                });
+
+                // Quick settings
+                ui.label("Quick Settings:");
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut config.show_touches, "Show touches");
+                    ui.checkbox(&mut config.fullscreen, "Fullscreen");
+                    ui.checkbox(&mut config.turn_screen_off, "Turn screen off");
+                });
+
+                // Max dimensions from settings (adjustable)
+                ui.horizontal(|ui| {
+                    let mut dim_val = config.dimension.unwrap_or(0);
+                    ui.label("Max dimensions:");
+                    if ui.add(egui::DragValue::new(&mut dim_val).clamp_range(0..=8192).speed(10)).changed() {
+                        if dim_val == 0 {
+                            config.dimension = None;
+                        } else {
+                            config.dimension = Some(dim_val);
+                        }
+                    }
+                    if ui.button("Unlimited").clicked() {
+                        config.dimension = None;
+                    }
+                    if let Some(dim) = config.dimension {
+                        ui.label(format!("({} px)", dim));
+                    } else {
+                        ui.label("(unlimited)");
+                    }
+                });
+            }
+            // --- End config lock scope ---
 
             if start_scrcpy {
                 self.start_scrcpy();
@@ -304,43 +371,6 @@ impl DroidViewApp {
             if stop_scrcpy {
                 self.stop_scrcpy();
             }
-
-            // Quick settings
-            ui.label("Quick Settings:");
-
-            let mut config = self.config.try_lock().unwrap();
-
-            ui.horizontal(|ui| {
-                ui.label("Bitrate:");
-                ui.add(egui::Slider::new(&mut config.bitrate, 1000..=20000).text("KB/s"));
-            });
-
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut config.show_touches, "Show touches");
-                ui.checkbox(&mut config.fullscreen, "Fullscreen");
-                ui.checkbox(&mut config.turn_screen_off, "Turn screen off");
-            });
-
-            // Max dimensions from settings (adjustable)
-            ui.horizontal(|ui| {
-                let mut dim_val = config.dimension.unwrap_or(0);
-                ui.label("Max dimensions:");
-                if ui.add(egui::DragValue::new(&mut dim_val).clamp_range(0..=8192).speed(10)).changed() {
-                    if dim_val == 0 {
-                        config.dimension = None;
-                    } else {
-                        config.dimension = Some(dim_val);
-                    }
-                }
-                if ui.button("Unlimited").clicked() {
-                    config.dimension = None;
-                }
-                if let Some(dim) = config.dimension {
-                    ui.label(format!("({} px)", dim));
-                } else {
-                    ui.label("(unlimited)");
-                }
-            });
         });
 
         if let Ok(config) = self.config.try_lock() {
@@ -406,7 +436,7 @@ impl DroidViewApp {
             // Log configuration details
             info!("Starting scrcpy with configuration:");
             info!("  Device: {} ({})", device.model, device.identifier);
-            info!("  Bitrate: {} KB/s", config.bitrate);
+            info!("  Bitrate: {}", config.bitrate);
             info!("  Orientation: {:?}", config.orientation);
             info!("  Show touches: {}", config.show_touches);
             info!("  Display force on: {}", config.turn_screen_off);
@@ -416,7 +446,7 @@ impl DroidViewApp {
 
             let args = scrcpy_bridge.build_args(
                 Some(&device.identifier),
-                config.bitrate,
+                &config.bitrate,
                 config.orientation.clone(),
                 config.show_touches,
                 config.fullscreen,

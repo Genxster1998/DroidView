@@ -104,8 +104,41 @@ fn show_settings_content(ui: &mut Ui, config: &mut AppConfig) -> SettingsResult 
         ui.group(|ui| {
             ui.heading("Video Settings");
 
-            ui.label(format!("Bitrate: {} KB/s", config.bitrate));
-            ui.add(egui::Slider::new(&mut config.bitrate, 1000..=20000).text("Bitrate"));
+            // Bitrate selection with K/M units
+            let mut bitrate_value: u32 = {
+                // Parse the numeric part from config.bitrate
+                let s = config.bitrate.trim().to_uppercase();
+                if s.ends_with('M') {
+                    s.trim_end_matches('M').parse::<u32>().unwrap_or(8) * 1000
+                } else if s.ends_with('K') {
+                    s.trim_end_matches('K').parse::<u32>().unwrap_or(8000)
+                } else {
+                    s.parse::<u32>().unwrap_or(8000)
+                }
+            };
+            let mut bitrate_unit = if config.bitrate.trim().to_uppercase().ends_with('M') {
+                "Mbps"
+            } else {
+                "Kbps"
+            };
+
+            ui.horizontal(|ui| {
+                ui.label("Bitrate:");
+                ui.add(egui::Slider::new(&mut bitrate_value, 100..=20000).text("Value"));
+                egui::ComboBox::from_id_source("bitrate_unit_combo")
+                    .selected_text(bitrate_unit)
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut bitrate_unit, "Kbps", "Kbps");
+                        ui.selectable_value(&mut bitrate_unit, "Mbps", "Mbps");
+                    });
+            });
+            let bitrate_str = if bitrate_unit == "Mbps" {
+                format!("{}M", (bitrate_value as f32 / 1000.0).round() as u32)
+            } else {
+                format!("{}K", bitrate_value)
+            };
+            config.bitrate = bitrate_str;
+            ui.label(format!("Current: {}", config.bitrate));
 
             ui.label("Orientation:");
             let orientations = [

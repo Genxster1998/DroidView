@@ -8,7 +8,7 @@ use std::path::PathBuf;
 pub struct AppConfig {
     pub adb_path: Option<String>,
     pub scrcpy_path: Option<String>,
-    pub bitrate: u32,
+    pub bitrate: String,
     pub orientation: Option<String>,
     pub show_touches: bool,
     pub turn_screen_off: bool,
@@ -40,7 +40,7 @@ impl Default for AppConfig {
         Self {
             adb_path: None,
             scrcpy_path: None,
-            bitrate: 8000,
+            bitrate: "8M".to_string(),
             orientation: None,
             show_touches: false,
             turn_screen_off: false,

@@ -257,7 +257,7 @@ impl ScrcpyBridge {
     pub fn build_args(
         &self,
         device_id: Option<&str>,
-        bitrate: u32,
+        bitrate: &str,
         orientation: Option<String>,
         show_touches: bool,
         fullscreen: bool,
