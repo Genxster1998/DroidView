@@ -2,7 +2,7 @@
   <img src="assets/icon.png" alt="DroidView Logo" width="128" height="128">
   <h1>DroidView</h1>
   
-  [![Build Status](https://github.com/genx/DroidView/workflows/CI/badge.svg)](https://github.com/genx/DroidView/actions)
+  [![Build Status](https://github.com/Genxster1998/DroidView/workflows/CI/badge.svg)](https://github.com/Genxster1998/DroidView/actions)
   [![Crates.io](https://img.shields.io/crates/v/droid_view)](https://crates.io/crates/droid_view)
   [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
   [![egui](https://img.shields.io/badge/egui-0.31.0-blue.svg)](https://github.com/emilk/egui)
@@ -10,6 +10,13 @@
   [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](https://github.com/genx/DroidView)
   
   A modern, user-friendly graphical frontend for [scrcpy](https://github.com/Genymobile/scrcpy) and ADB, enabling you to mirror, control, and manage your Android devices from your desktop.
+</div>
+
+## Screenshot
+
+<div align="center">
+  <img src="screenshots/Main_Window.png" alt="DroidView Main Window" width="800">
+  <p><em>DroidView main interface showing device management and toolkit features</em></p>
 </div>
 
 ## Features
@@ -22,7 +29,10 @@
 - Cross-platform (Linux, macOS, Windows)
 
 ## Installation
-1. Install [scrcpy](https://github.com/Genymobile/scrcpy) and [ADB](https://developer.android.com/studio/releases/platform-tools).
+1. Install [scrcpy](https://github.com/Genymobile/scrcpy) and [ADB](https://developer.android.com/studio/releases/platform-tools). Make sure they are in your system PATH.
+2. Go to [Releases](https://github.com/Genxster1998/DroidView/releases) and download for your system.
+
+## Build
 2. Build DroidView with Cargo:
    ```sh
    cargo build --release
