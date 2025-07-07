@@ -1,3 +1,21 @@
+/*
+ * DroidView - A simple, pluggable, graphical user interface for scrcpy
+ * Copyright (C) 2024 Genxster1998 <ck.2229.ck@gmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 use crate::bridge::{AdbBridge, ScrcpyBridge};
 use crate::config::AppConfig;
 use crate::device::{get_devices, Device};
@@ -1464,8 +1482,8 @@ impl eframe::App for DroidViewApp {
                 .show(ctx, |ui| {
                     egui::Frame::popup(ui.style())
                         .show(ui, |ui| {
-                            ui.set_width(280.0);
-                            ui.set_height(180.0);
+                            ui.set_width(320.0);
+                            ui.set_height(280.0);
                             
                             ui.vertical_centered(|ui| {
                                 ui.add_space(8.0);
@@ -1493,17 +1511,31 @@ impl eframe::App for DroidViewApp {
                                 // App name and version
                                 ui.label(egui::RichText::new("DroidView").size(20.0).strong());
                                 ui.label(egui::RichText::new("(droid_view)").size(10.0).color(Color32::GRAY));
-                                ui.label(egui::RichText::new("Version 0.1.2").size(12.0));
+                                ui.label(egui::RichText::new("Version 0.1.3").size(12.0));
                                 
                                 ui.add_space(8.0);
                                 
                                 // Author
-                                ui.label(egui::RichText::new("Author: Genxster1998").size(11.0));
+                                /*ui.label(egui::RichText::new("Author: Genxster1998").size(11.0));
                                 
-                                ui.add_space(4.0);
+                                ui.add_space(4.0);*/
                                 
                                 // Copyright
                                 ui.label(egui::RichText::new("© 2024 Genxster1998").size(10.0).color(Color32::GRAY));
+                                
+                                ui.add_space(8.0);
+                                
+                                // License information
+                                ui.label(egui::RichText::new("License: GNU General Public License v3").size(10.0).color(Color32::GRAY));
+                                
+                                ui.add_space(4.0);
+                                
+                                // License description
+                                ui.label(egui::RichText::new("This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.").size(9.0).color(Color32::GRAY));
+                                
+                                ui.add_space(4.0);
+                                
+                                ui.label(egui::RichText::new("This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.").size(9.0).color(Color32::GRAY));
                                 
                                 ui.add_space(8.0);
                                 
@@ -1514,6 +1546,19 @@ impl eframe::App for DroidViewApp {
                                         // Open URL in default browser
                                         let _ = std::process::Command::new("open")
                                             .arg("https://github.com/Genxster1998/DroidView")
+                                            .output();
+                                    }
+                                });
+                                
+                                ui.add_space(8.0);
+                                
+                                // License link
+                                ui.vertical_centered(|ui| {
+                                    ui.label(egui::RichText::new("License:").size(10.0));
+                                    if ui.link(egui::RichText::new("📄 View Full License").size(11.0).color(Color32::CYAN)).clicked() {
+                                        // Open GPL v3 license in default browser
+                                        let _ = std::process::Command::new("open")
+                                            .arg("https://www.gnu.org/licenses/gpl-3.0.html")
                                             .output();
                                     }
                                 });
