@@ -1,7 +1,7 @@
 # DroidView Build and Release Workflow
 # Author: Genxster1998
 # Project: https://github.com/Genxster1998/DroidView
-# Description: Build and publish cross-platform releases for DroidView (v0.1.1)
+# Description: Build and publish cross-platform releases for DroidView (v0.1.4)
 
 name: Build and Release DroidView
 

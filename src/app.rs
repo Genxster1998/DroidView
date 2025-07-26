@@ -1549,7 +1549,7 @@ impl eframe::App for DroidViewApp {
                                 // App name and version
                                 ui.label(egui::RichText::new("DroidView").size(20.0).strong());
                                 ui.label(egui::RichText::new("(droid_view)").size(10.0).color(Color32::GRAY));
-                                ui.label(egui::RichText::new("Version 0.1.3").size(12.0));
+                                ui.label(egui::RichText::new("Version 0.1.4").size(12.0));
                                 
                                 ui.add_space(8.0);
                                 
