@@ -72,4 +72,16 @@ winapi = { version = "0.3", features = ["winuser", "shellapi"] }
 libc = "0.2"
 
 [dev-dependencies]
-tokio-test = "0.4" 
+tokio-test = "0.4"
+
+[profile.release]
+# Optimize for size and performance
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Additional optimizations
+overflow-checks = false
+debug = false 

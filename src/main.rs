@@ -1,3 +1,5 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 /*
  * DroidView - A simple, pluggable, graphical user interface for scrcpy
  * Copyright (C) 2024 Genxster1998 <ck.2229.ck@gmail.com>
