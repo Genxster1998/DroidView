@@ -235,7 +235,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new(format!("{} Disable App", egui_phosphor::fill::X_CIRCLE)).size(13.0)
+                            egui::RichText::new(format!("{} Disable App", egui_phosphor::fill::PROHIBIT)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::DisableApp;

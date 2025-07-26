@@ -99,6 +99,10 @@ async fn main() -> Result<(), eframe::Error> {
 
     let native_options = NativeOptions {
         viewport,
+        vsync: true,  // Enable vsync for smoother rendering
+        multisampling: 0,  // Disable multisampling for better performance
+        depth_buffer: 0,   // Disable depth buffer since we don't need 3D
+        stencil_buffer: 0, // Disable stencil buffer
         ..Default::default()
     };
 

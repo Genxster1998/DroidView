@@ -127,6 +127,9 @@ pub struct DroidViewApp {
     task_handles: HashMap<String, JoinHandle<()>>,
     result_receiver: mpsc::UnboundedReceiver<BackgroundTaskResult>,
     result_sender: mpsc::UnboundedSender<BackgroundTaskResult>,
+    // Performance optimization: timing for periodic updates
+    last_bridge_update: std::time::Instant,
+    last_scrcpy_status_update: std::time::Instant,
 }
 
 impl DroidViewApp {
@@ -174,10 +177,17 @@ impl DroidViewApp {
             task_handles: HashMap::new(),
             result_receiver,
             result_sender,
+            // Performance optimization: timing for periodic updates
+            last_bridge_update: std::time::Instant::now(),
+            last_scrcpy_status_update: std::time::Instant::now(),
         };
         
         // Set config for wireless ADB panel to remember IPs
         app.wireless_adb_panel.set_config(config);
+        
+        // Initial setup: update bridges and refresh devices on first launch
+        app.update_bridges();
+        app.refresh_devices();
         
         app
     }
@@ -1180,9 +1190,32 @@ impl eframe::App for DroidViewApp {
             self.apply_panel_visibility_from_config();
             self.apply_theme(ctx);
         }
-        self.update_bridges();
-        self.refresh_devices();
-        self.update_scrcpy_status();
+        
+        // Performance optimization: Only update expensive operations periodically
+        let now = std::time::Instant::now();
+        
+        // Update bridges every 2 seconds
+        if now.duration_since(self.last_bridge_update).as_secs() >= 2 {
+            self.update_bridges();
+            self.last_bridge_update = now;
+        }
+        
+        // Note: Device refresh is now only done on first launch and manual triggers
+        // Removed automatic periodic refresh for better performance
+        
+        // Update scrcpy status every 500ms
+        if now.duration_since(self.last_scrcpy_status_update).as_millis() >= 500 {
+            self.update_scrcpy_status();
+            self.last_scrcpy_status_update = now;
+        }
+        
+        // Request repaint only when needed for better performance
+        if self.is_processing() || self.scrcpy_running {
+            ctx.request_repaint();
+        } else {
+            // Reduce frame rate when idle for better performance
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        }
 
         // Left panel (device list)
         egui::SidePanel::left("device_panel")
@@ -1324,16 +1357,16 @@ impl eframe::App for DroidViewApp {
         // Show IMEI popup if available
         if let Some(imei) = &self.imei_popup {
             let imei_clone = imei.clone();
-            egui::Window::new("Device IMEI")
+            egui::Window::new(format!("{} Device IMEI", egui_phosphor::fill::PHONE))
                 .collapsible(false)
                 .resizable(false)
                 .fixed_size(egui::vec2(260.0, 120.0))
                 .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new("📱 Device IMEI").size(12.0));
-                    ui.separator();
+                    // ui.add_space(4.0);
+                    // ui.label(egui::RichText::new("📱 Device IMEI").size(12.0));
+                    // ui.separator();
                     ui.label(egui::RichText::new(&imei_clone).size(22.0).monospace());
                     ui.separator();
                     if ui.add(egui::Button::new(egui::RichText::new("Close").size(12.0))).clicked() {
@@ -1345,16 +1378,16 @@ impl eframe::App for DroidViewApp {
         // Show Display Info popup if available
         if let Some(display_info) = &self.display_popup {
             let display_clone = display_info.clone();
-            egui::Window::new("Display Information")
+            egui::Window::new(format!("{} Display Information", egui_phosphor::fill::MONITOR))
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(400.0, 300.0))
                 .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new("📺 Display Information").size(12.0));
-                    ui.separator();
+                    // ui.add_space(4.0);
+                    // ui.label(egui::RichText::new("📺 Display Information").size(12.0));
+                    // ui.separator();
                     egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
                         ui.label(egui::RichText::new(&display_clone).size(11.0).monospace());
                     });
@@ -1368,16 +1401,16 @@ impl eframe::App for DroidViewApp {
         // Show Battery Info popup if available
         if let Some(battery_info) = &self.battery_popup {
             let battery_clone = battery_info.clone();
-            egui::Window::new("Battery Information")
+            egui::Window::new(format!("{} Battery Information", egui_phosphor::fill::BATTERY_FULL))
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(350.0, 250.0))
                 .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new("🔋 Battery Information").size(12.0));
-                    ui.separator();
+                    // ui.add_space(4.0);
+                    // ui.label(egui::RichText::new("🔋 Battery Information").size(12.0));
+                    // ui.separator();
                     egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
                         ui.label(egui::RichText::new(&battery_clone).size(11.0).monospace());
                     });
@@ -1390,17 +1423,14 @@ impl eframe::App for DroidViewApp {
 
         // Show Screen Recording Dialog if available
         if self.screenrecord_dialog {
-            egui::Window::new("Screen Recording Settings")
+            egui::Window::new(format!("{} Screen Recording Settings", egui_phosphor::fill::RECORD))
                 .collapsible(false)
                 .resizable(false)
                 .fixed_size(egui::vec2(300.0, 200.0))
                 .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new("🎥 Screen Recording Settings").size(12.0));
-                    ui.separator();
-                    
+
                     ui.horizontal(|ui| {
                         ui.label("Duration (seconds):");
                         ui.add(egui::DragValue::new(&mut self.screenrecord_duration).range(1..=180).speed(1));
@@ -1700,16 +1730,16 @@ impl eframe::App for DroidViewApp {
 
         // Show Disable App Dialog if available
         if self.disable_dialog {
-            egui::Window::new("Disable Application")
+            egui::Window::new(format!("{} Disable Application", egui_phosphor::fill::PROHIBIT))
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(400.0, 500.0))
                 .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new("🚫 Disable Application").size(12.0));
-                    ui.separator();
+                    //ui.add_space(4.0);
+                    //ui.label(egui::RichText::new("🚫 Disable Application").size(12.0));
+                    //ui.separator();
                     
                     if self.loading_disable_apps {
                         ui.vertical_centered(|ui| {
