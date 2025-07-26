@@ -117,6 +117,9 @@ pub struct DroidViewApp {
     disable_app_list: Vec<(String, String)>, // (package_name, app_name)
     selected_disable_apps: std::collections::HashSet<String>, // package names
     about_dialog: bool,
+    // Success dialogs
+    screenshot_success_dialog: Option<String>,
+    screenrecord_success_dialog: Option<String>,
     // Async processing states
     loading_apps: bool,
     loading_disable_apps: bool,
@@ -167,6 +170,9 @@ impl DroidViewApp {
             disable_app_list: Vec::new(),
             selected_disable_apps: std::collections::HashSet::new(),
             about_dialog: false,
+            // Success dialogs
+            screenshot_success_dialog: None,
+            screenrecord_success_dialog: None,
             // Async processing states
             loading_apps: false,
             loading_disable_apps: false,
@@ -590,17 +596,17 @@ impl DroidViewApp {
         {
             match action {
                 ToolkitAction::Screenshot => {
-                    // Save screenshot to desktop
+                    // Save screenshot to desktop with timestamp
                     let desktop = dirs::desktop_dir().unwrap_or_default();
-                    let file_path = desktop.join("screenshot.png");
+                    let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                    let file_path = desktop.join(format!("screenshot_{}.png", timestamp));
                     let status = std::process::Command::new(adb_bridge.path())
                         .args(["-s", &device.identifier, "exec-out", "screencap", "-p"])
                         .stdout(std::fs::File::create(&file_path).unwrap())
                         .status();
                     match status {
                         Ok(s) if s.success() => {
-                            self.status_message =
-                                format!("Screenshot saved to {}", file_path.display());
+                            self.screenshot_success_dialog = Some(format!("Screenshot saved to {}", file_path.display()));
                         }
                         Ok(s) => {
                             self.status_message = format!("Screenshot failed: exit code {}", s);
@@ -1462,9 +1468,10 @@ impl eframe::App for DroidViewApp {
                                     .status();
                                 match status {
                                     Ok(s) if s.success() => {
-                                        // Pull the file
+                                        // Pull the file with timestamp
                                         let desktop = dirs::desktop_dir().unwrap_or_default();
-                                        let file_path = desktop.join("video.mp4");
+                                        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                                        let file_path = desktop.join(format!("screenrecord_{}.mp4", timestamp));
                                         let pull_status = std::process::Command::new(adb_bridge.path())
                                             .args([
                                                 "-s",
@@ -1476,7 +1483,7 @@ impl eframe::App for DroidViewApp {
                                             .status();
                                         match pull_status {
                                             Ok(ps) if ps.success() => {
-                                                self.status_message = format!("Screenrecord saved to {}", file_path.display());
+                                                self.screenrecord_success_dialog = Some(format!("Screen recording saved to {}", file_path.display()));
                                             }
                                             Ok(ps) => {
                                                 self.status_message = format!("Pull failed: exit code {}", ps);
@@ -1849,6 +1856,54 @@ impl eframe::App for DroidViewApp {
                             }
                         });
                     }
+                });
+        }
+
+        // Show Screenshot Success Dialog
+        if let Some(success_message) = &self.screenshot_success_dialog {
+            let message_clone = success_message.clone();
+            egui::Window::new(format!("{} Screenshot Success", egui_phosphor::fill::CHECK_CIRCLE))
+                .collapsible(false)
+                .resizable(false)
+                .fixed_size(egui::vec2(400.0, 120.0))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(egui::RichText::new(format!("{}", egui_phosphor::fill::CHECK_CIRCLE)).size(32.0).color(Color32::GREEN));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Screenshot Saved Successfully!").size(14.0).strong());
+                        ui.add_space(4.0);
+                        ui.label(egui::RichText::new(message_clone).size(11.0).monospace());
+                        ui.add_space(12.0);
+                        if ui.add(egui::Button::new(egui::RichText::new("OK").size(12.0)).min_size(egui::vec2(60.0, 24.0))).clicked() {
+                            self.screenshot_success_dialog = None;
+                        }
+                    });
+                });
+        }
+
+        // Show Screen Recording Success Dialog
+        if let Some(success_message) = &self.screenrecord_success_dialog {
+            let message_clone = success_message.clone();
+            egui::Window::new(format!("{} Screen Recording Success", egui_phosphor::fill::CHECK_CIRCLE))
+                .collapsible(false)
+                .resizable(false)
+                .fixed_size(egui::vec2(400.0, 120.0))
+                .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
+                .pivot(egui::Align2::CENTER_CENTER)
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label(egui::RichText::new(format!("{}", egui_phosphor::fill::CHECK_CIRCLE)).size(32.0).color(Color32::GREEN));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new("Screen Recording Saved Successfully!").size(14.0).strong());
+                        ui.add_space(4.0);
+                        ui.label(egui::RichText::new(message_clone).size(11.0).monospace());
+                        ui.add_space(12.0);
+                        if ui.add(egui::Button::new(egui::RichText::new("OK").size(12.0)).min_size(egui::vec2(60.0, 24.0))).clicked() {
+                            self.screenrecord_success_dialog = None;
+                        }
+                    });
                 });
         }
 
