@@ -80,19 +80,19 @@ impl SwipePanel {
             ui.heading("Swipe Controls");
 
             ui.horizontal(|ui| {
-                if ui.button("▲ Swipe Up").clicked() {
+                if ui.button(format!("{} Swipe Up", egui_phosphor::fill::ARROW_UP)).clicked() {
                     action = Some(SwipeAction::Up);
                 }
-                if ui.button("▼ Swipe Down").clicked() {
+                if ui.button(format!("{} Swipe Down", egui_phosphor::fill::ARROW_DOWN)).clicked() {
                     action = Some(SwipeAction::Down);
                 }
             });
 
             ui.horizontal(|ui| {
-                if ui.button("◀ Swipe Left").clicked() {
+                if ui.button(format!("{} Swipe Left", egui_phosphor::fill::ARROW_LEFT)).clicked() {
                     action = Some(SwipeAction::Left);
                 }
-                if ui.button("▶ Swipe Right").clicked() {
+                if ui.button(format!("{} Swipe Right", egui_phosphor::fill::ARROW_RIGHT)).clicked() {
                     action = Some(SwipeAction::Right);
                 }
             });
@@ -135,7 +135,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("📸 Screenshot").size(13.0)
+                            egui::RichText::new(format!("{} Screenshot", egui_phosphor::fill::CROP)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::Screenshot;
@@ -146,7 +146,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("🎥 Record Screen").size(13.0)
+                            egui::RichText::new(format!("{} Record Screen", egui_phosphor::fill::RECORD)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::RecordScreen;
@@ -157,7 +157,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("📱 Install APK").size(13.0)
+                            egui::RichText::new(format!("{} Install APK", egui_phosphor::fill::GOOGLE_PLAY_LOGO)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::InstallApk;
@@ -168,7 +168,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("💻 ADB Shell").size(13.0)
+                            egui::RichText::new(format!("{} ADB Shell", egui_phosphor::fill::TERMINAL)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::OpenShell;
@@ -179,7 +179,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("📱 Show IMEI").size(13.0)
+                            egui::RichText::new(format!("{} Show IMEI", egui_phosphor::fill::PHONE)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::ShowImei;
@@ -193,7 +193,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("📺 Display Info").size(13.0)
+                            egui::RichText::new(format!("{} Display Info", egui_phosphor::fill::MONITOR)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::DisplayInfo;
@@ -207,7 +207,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("🔋 Battery Info").size(13.0)
+                            egui::RichText::new(format!("{} Battery Info", egui_phosphor::fill::BATTERY_FULL)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::BatteryInfo;
@@ -221,7 +221,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("🗑️ Uninstall App").size(13.0)
+                            egui::RichText::new(format!("{} Uninstall App", egui_phosphor::fill::TRASH_SIMPLE)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::UninstallApp;
@@ -235,7 +235,7 @@ impl ToolkitPanel {
                 ui.vertical_centered(|ui| {
                     if ui.add(
                         egui::Button::new(
-                            egui::RichText::new("🚫 Disable App").size(13.0)
+                            egui::RichText::new(format!("{} Disable App", egui_phosphor::fill::X_CIRCLE)).size(13.0)
                         ).min_size(egui::vec2(120.0, 28.0))
                     ).clicked() {
                         action = ToolkitAction::DisableApp;
@@ -253,7 +253,7 @@ impl ToolkitPanel {
                 ui.horizontal(|ui| {
                     // Reboot button
                     let reboot_resp = ui.add(
-                        egui::Button::new(egui::RichText::new("🔄").size(16.0))
+                        egui::Button::new(egui::RichText::new(format!("{}", egui_phosphor::fill::ARROW_CLOCKWISE)).size(16.0))
                             .min_size(egui::vec2(32.0, 32.0))
                     );
                     if reboot_resp.clicked() {
@@ -263,7 +263,7 @@ impl ToolkitPanel {
 
                     // Shutdown button
                     let shutdown_resp = ui.add(
-                        egui::Button::new(egui::RichText::new("⏹️").size(16.0))
+                        egui::Button::new(egui::RichText::new(format!("{}", egui_phosphor::fill::POWER)).size(16.0))
                             .min_size(egui::vec2(32.0, 32.0))
                     );
                     if shutdown_resp.clicked() {
@@ -273,7 +273,7 @@ impl ToolkitPanel {
 
                     // Reboot to Recovery button
                     let recovery_resp = ui.add(
-                        egui::Button::new(egui::RichText::new("🛠️").size(16.0))
+                        egui::Button::new(egui::RichText::new(format!("{}", egui_phosphor::fill::WRENCH)).size(16.0))
                             .min_size(egui::vec2(32.0, 32.0))
                     );
                     if recovery_resp.clicked() {
@@ -283,7 +283,7 @@ impl ToolkitPanel {
 
                     // Reboot to Bootloader button
                     let bootloader_resp = ui.add(
-                        egui::Button::new(egui::RichText::new("🔧").size(16.0))
+                        egui::Button::new(egui::RichText::new(format!("{}", egui_phosphor::fill::GEAR)).size(16.0))
                             .min_size(egui::vec2(32.0, 32.0))
                     );
                     if bootloader_resp.clicked() {
@@ -300,8 +300,8 @@ impl ToolkitPanel {
                         .fixed_size(egui::vec2(300.0, 150.0))
                         .show(ui.ctx(), |ui| {
                             ui.vertical_centered(|ui| {
-                                ui.label(egui::RichText::new("⚠️ Confirm Device Reboot").size(16.0).strong());
-                                ui.add_space(8.0);
+                                ui.label(egui::RichText::new(format!("{}", egui_phosphor::fill::WARNING)).size(48.0).strong());
+                                ui.add_space(4.0);
                                 ui.label("Are you sure you want to reboot the device?");
                                 ui.add_space(16.0);
                                 ui.horizontal(|ui| {
@@ -324,8 +324,8 @@ impl ToolkitPanel {
                         .fixed_size(egui::vec2(300.0, 150.0))
                         .show(ui.ctx(), |ui| {
                             ui.vertical_centered(|ui| {
-                                ui.label(egui::RichText::new("⚠️ Confirm Device Shutdown").size(16.0).strong());
-                                ui.add_space(8.0);
+                                ui.label(egui::RichText::new(format!("{}", egui_phosphor::fill::WARNING)).size(48.0).strong());
+                                ui.add_space(4.0);
                                 ui.label("Are you sure you want to shutdown the device?");
                                 ui.add_space(16.0);
                                 ui.horizontal(|ui| {
@@ -348,8 +348,8 @@ impl ToolkitPanel {
                         .fixed_size(egui::vec2(300.0, 150.0))
                         .show(ui.ctx(), |ui| {
                             ui.vertical_centered(|ui| {
-                                ui.label(egui::RichText::new("⚠️ Confirm Recovery Reboot").size(16.0).strong());
-                                ui.add_space(8.0);
+                                ui.label(egui::RichText::new(format!("{}", egui_phosphor::fill::WARNING)).size(48.0).strong());
+                                ui.add_space(4.0);
                                 ui.label("Are you sure you want to reboot to recovery mode?");
                                 ui.add_space(16.0);
                                 ui.horizontal(|ui| {
@@ -372,8 +372,8 @@ impl ToolkitPanel {
                         .fixed_size(egui::vec2(300.0, 150.0))
                         .show(ui.ctx(), |ui| {
                             ui.vertical_centered(|ui| {
-                                ui.label(egui::RichText::new("⚠️ Confirm Bootloader Reboot").size(16.0).strong());
-                                ui.add_space(8.0);
+                                ui.label(egui::RichText::new(format!("{}", egui_phosphor::fill::WARNING)).size(48.0).strong());
+                                ui.add_space(4.0);
                                 ui.label("Are you sure you want to reboot to bootloader?");
                                 ui.add_space(16.0);
                                 ui.horizontal(|ui| {

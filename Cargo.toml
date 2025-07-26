@@ -11,9 +11,10 @@ categories = ["gui", "system"]
 
 [dependencies]
 # GUI Framework
-eframe = "0.31"
-egui = "0.31"
-egui_extras = "0.31"
+eframe = "0.32"
+egui = "0.32"
+egui_extras = "0.32"
+egui-phosphor = { version = "0.10.0", features = ["regular", "fill", "bold", "light", "thin"] }
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
@@ -62,7 +63,7 @@ notify-rust = "4.8"
 rfd = "0.14"
 
 # Rotary knob UI
-egui_knob = "0.2"
+egui_knob = "0.3.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winuser", "shellapi"] }

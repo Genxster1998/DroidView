@@ -25,6 +25,7 @@ use egui::IconData;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use droid_view::app::ICON_PNG;
+use egui_phosphor;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -107,6 +108,12 @@ async fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "DroidView",
         native_options,
-        Box::new(move |cc| Ok(Box::new(DroidViewApp::new(cc, config, debug_disable_scrcpy)))),
+        Box::new(move |cc| {
+            // Register Phosphor icons font
+            let mut fonts = egui::FontDefinitions::default();
+            egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Fill);
+            cc.egui_ctx.set_fonts(fonts);
+            Ok(Box::new(DroidViewApp::new(cc, config, debug_disable_scrcpy)))
+        }),
     )
 }

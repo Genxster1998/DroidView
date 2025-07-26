@@ -33,6 +33,7 @@ use crate::utils::is_process_running;
 use crate::ui::BottomPanelAction;
 use std::collections::HashMap;
 use egui_knob::{Knob, KnobStyle, LabelPosition};
+use egui_phosphor;
 
 // Background task results
 #[derive(Debug)]
@@ -1272,9 +1273,9 @@ impl eframe::App for DroidViewApp {
                         };
                         
                         let theme_text = match current_theme.as_str() {
-                            "dark" => "🌙 Dark",
-                            "light" => "☀️ Light",
-                            _ => "🌙 Dark"
+                            "dark" => format!("{} Dark", egui_phosphor::fill::MOON),
+                            "light" => format!("{} Light", egui_phosphor::fill::SUN),
+                            _ => format!("{} Dark", egui_phosphor::fill::MOON)
                         };
                         
                         if ui.button(egui::RichText::new(theme_text).size(12.0)).clicked() {
@@ -1284,7 +1285,7 @@ impl eframe::App for DroidViewApp {
                         ui.separator();
                         
                         // About button
-                        if ui.button(egui::RichText::new("ℹ️ About").size(12.0)).clicked() {
+                        if ui.button(egui::RichText::new(format!("{} About", egui_phosphor::fill::INFO)).size(12.0)).clicked() {
                             self.about_dialog = true;
                         }
                     });
@@ -1504,8 +1505,8 @@ impl eframe::App for DroidViewApp {
                                     ui.add(egui::Image::new(&texture_id).fit_to_exact_size(egui::vec2(48.0, 48.0)));
                                     ui.add_space(8.0);
                                 } else {
-                                    // Fallback to emoji if icon not found
-                                    ui.label(egui::RichText::new("📱").size(32.0));
+                                    // Fallback to Phosphor icon if icon not found
+                                    ui.label(egui::RichText::new(format!("{}", egui_phosphor::regular::ANDROID_LOGO)).size(32.0));
                                 }
                                 
                                 // App name and version
@@ -1576,16 +1577,16 @@ impl eframe::App for DroidViewApp {
 
         // Show Uninstall App Dialog if available
         if self.uninstall_dialog {
-            egui::Window::new("Uninstall Application")
+            egui::Window::new(format!("{} Uninstall Application", egui_phosphor::fill::TRASH))
                 .collapsible(false)
                 .resizable(true)
                 .default_size(egui::vec2(400.0, 500.0))
                 .frame(egui::Frame::window(&egui::Style::default()).corner_radius(egui::CornerRadius::same(0)))
                 .pivot(egui::Align2::CENTER_CENTER)
                 .show(ctx, |ui| {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new("🗑️ Uninstall Application").size(12.0));
-                    ui.separator();
+                    //ui.add_space(4.0);
+                    //ui.label(egui::RichText::new(format!("{}", egui_phosphor::fill::TRASH)).size(32.0));
+                    //ui.separator();
                     
                     if self.loading_apps {
                         ui.vertical_centered(|ui| {
